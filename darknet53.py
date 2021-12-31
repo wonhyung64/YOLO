@@ -456,7 +456,3 @@ class Darknet53(Model):
         #
         return output
 #%%
-# from tensorflow.keras.layers import Input
-# model = Darknet53()
-# inputs = tf.keras.Input(shape=(256,256,3))
-# model.call(inputs)
