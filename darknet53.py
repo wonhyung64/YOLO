@@ -1,9 +1,9 @@
 #%%
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, Conv2D, GlobalAveragePooling2D, Dense, Add, BatchNormalization, LeakyReLU
-from tensorflow.keras.models import Model
+from tensorflow.keras.layers import layer, conv2d, globalaveragepooling2d, dense, add, batchnormalization, leakyrelu
+from tensorflow.keras.models import model
 #%%
-class conv2d(Layer):
+class conv2d(layer):
     def __init__(self, filters, kernel_size, strides=1, **kwargs):
         super(conv2d, self).__init__(**kwargs)
         self.filters = filters
@@ -11,7 +11,7 @@ class conv2d(Layer):
         self.strides = strides
 
     def build(self, input_shape):
-        self.conv = Conv2D(self.filters, self.kernel_size, self.strides, padding=("same" if self.strides==1 else "valid"))
+        self.conv = conv2d(self.filters, self.kernel_size, self.strides, padding=("same" if self.strides==1 else "valid"))
         super(conv2d, self).build(input_shape)
 
     def call(self, inputs):
