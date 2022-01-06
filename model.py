@@ -29,14 +29,90 @@ class conv_block(Layer):
             tensor = self.bn(tensor)
             tensor = self.ac(tensor)
         return tensor
-
+#%%
 def res_block(inputs, num):
     for _ in range(num):
         x = conv_block(inputs.shape[-1]//2, 1)(inputs)
         x = conv_block(inputs.shape[-1], 3)(x)
         x = Add()([inputs, x])
     return x
+#%%
+def output_to_pred(head, anchors, hyper_params):
+    batch_size = hyper_params["batch_size"]
+    img_size = hyper_params["img_size"]
+    total_class = hyper_params["total_class"]
 
+    grid_size = [head.shape[1], head.shape[2]]
+    grid_cell = generate_grid_cell(grid_size[0], grid_size[1])
+
+    ratio = tf.cast(img_size / grid_size[0], tf.float32)
+    scaled_anchors = [(anchor[0]/ratio, anchor[1]/ratio) for anchor in anchors]
+
+    head = tf.reshape(head, [batch_size, grid_size[0], grid_size[1], 3, 5 + total_class])
+    box_ctr_, box_size_, box_obj_, box_cls_ = tf.split(head, [2, 2, 1, total_class], axis=-1)
+
+    box_ctr = tf.nn.sigmoid(box_ctr_)
+
+    box_ctr = box_ctr + grid_cell
+    box_ctr = box_ctr * ratio # rescale to img size
+
+    box_size = tf.exp(box_size_) * scaled_anchors
+    box_size = box_size * ratio
+
+    box_coor = tf.concat([box_ctr, box_size], axis=-1) # x y w h
+    box_coor = tf.reshape(box_coor, [batch_size, grid_size[0] * grid_size[1], 3, 4])
+
+    box_obj = tf.sigmoid(box_obj_)
+    box_obj = tf.reshape(box_obj, [batch_size, grid_size[0] * grid_size[1], 3, 1])
+
+    box_cls = tf.sigmoid(box_cls_)
+    box_cls = tf.reshape(box_cls, [batch_size, grid_size[0] * grid_size[1], 3, total_class])
+    return box_coor, box_obj, box_cls
+
+#%%
+def generate_grid_cell(x_grid_size, y_grid_size):
+    grid_x = tf.range(x_grid_size, dtype=tf.int32)
+    grid_y = tf.range(y_grid_size, dtype=tf.int32)
+    grid_x, grid_y = tf.meshgrid(grid_x, grid_y)
+    flat_grid_x = tf.reshape(grid_x, (-1, 1))
+    flat_grid_y = tf.reshape(grid_y, (-1, 1))
+    flat_grid_cell = tf.concat([flat_grid_x, flat_grid_y], axis=-1)
+    grid_cell = tf.cast(tf.reshape(flat_grid_cell, [x_grid_size, y_grid_size, 1, 2]), tf.float32)
+    return grid_cell
+#%%
+class Head(Layer):
+    def __init__(self, anchors, hyper_params, **kwargs):
+        super(Head, self).__init__(**kwargs)
+        self.hyper_params = hyper_params
+        self.anchors = anchors
+
+    def call(self, inputs):
+        coor_lst, obj_lst, cls_lst = [], [], []
+        for i in range(len(inputs)):
+            box_coor, box_obj, box_cls = output_to_pred(inputs[i], self.anchors[i], self.hyper_params)
+            coor_lst.append(box_coor)
+            obj_lst.append(box_obj)
+            cls_lst.append(box_cls)
+            
+        boxes = tf.concat(coor_lst, axis=1)
+        boxes = tf.reshape(boxes, [boxes.shape[0], boxes.shape[1] * boxes.shape[2], -1])
+        x_ctr, y_ctr, width, height = tf.split(boxes, [1,1,1,1], axis=-1)
+        x1 = x_ctr - width/2
+        y1 = y_ctr - height/2
+        x2 = x_ctr + width/2
+        y2 = y_ctr + height/2
+        boxes = tf.concat([x1, y1, x2, y2], axis=-1)
+
+        confs = tf.concat(obj_lst, axis=1)
+        confs = tf.reshape(confs, [confs.shape[0], confs.shape[1] * confs.shape[2], -1])
+
+        probs = tf.concat(cls_lst, axis=1)
+        probs = tf.reshape(probs, [probs.shape[0], probs.shape[1] * probs.shape[2], -1])
+
+        pred = tf.concat([boxes, confs, probs], axis=-1)
+        return pred
+
+#%%
 def DarkNet53(include_top=True, input_shape=(None, None, 3)):
 
     input_x = Input(shape=input_shape)
@@ -68,7 +144,7 @@ def yolo_block(inputs, filters):
     return [head, fpn]
 
 #%%
-def yolo_v3(input_shape=(None, None, 3)):
+def yolo_v3(input_shape, hyper_params, anchors):
     base_model = DarkNet53(include_top=False, input_shape=input_shape)
 
     inputs = base_model.input
@@ -85,8 +161,10 @@ def yolo_v3(input_shape=(None, None, 3)):
     concat2 = Concatenate()([p2, base_model.output[0]])
     head3, _ = yolo_block(concat2, 128)
     head3 = Conv2D(3 * (5 + 80), 1, 1, bias_initializer=tf.zeros_initializer)(head3)
+    head = [head1, head2, head3]
+    outputs = Head(anchors, hyper_params)(head)
 
-    return Model(inputs=inputs, outputs=[head1, head2, head3])
+    return Model(inputs=inputs, outputs=outputs)
 # model = yolo_v3((416, 416, 3))
 # model.summary()
 # model.output

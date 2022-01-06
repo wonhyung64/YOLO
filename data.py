@@ -32,15 +32,16 @@ def download_dataset(dataset_name):
 #%%
 def serialize_example(example):
     image = example["image"]
+    image = tf.image.resize(image, (416, 416))
+    image_shape = image.shape
+    
     image = np.array(image).tobytes()
-
-    image_shape = example["image"].shape
     image_shape = np.array(image_shape).tobytes()
 
     bbox = example["bbox"]
+    bbox_shape = bbox.shape
+
     bbox = np.array(bbox).tobytes()
-    
-    bbox_shape = example["bbox"].shape
     bbox_shape = np.array(bbox_shape).tobytes()
 
     label = example['label']
@@ -81,7 +82,8 @@ def deserialize_example(serialized_string):
 #%%
 
 # train, validation, test = download_dataset("coco17")
-# for name, datasets in [("train", train), ("validation", validation), ("test", test)]:
+# # for name, datasets in [("train", train), ("validation", validation), ("test", test)]:
+# for name, datasets in [("validation", validation)]:
 #     writer = tf.io.TFRecordWriter(f"{data_dir}/{name}.tfrecord".encode("utf-8"))
 #     for i in datasets:
 #         example = {"image":i["image"]/255, "bbox":i["objects"]["bbox"], "label":i["objects"]["label"]}
