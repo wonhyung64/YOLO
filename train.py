@@ -58,11 +58,11 @@ for _ in progress_bar:
     
     for images, gt_boxes, gt_labels in dataset:
         break
-    print("\n DATA LOADED.")
+    # print("\n DATA LOADED.")
     box_loss, obj_loss, nobj_loss, cls_loss, total_loss = train_step(images, gt_boxes, gt_labels, box_prior, hyper_params)
 
     step += 1
-    print('epoch {}/{} | box_loss {:.4f}, obj_loss {:.4f}, nobj_loss {:.4f}, loss {:.4f}'.format(
+    print('epoch {}/{} | box_loss {:.4f}, obj_loss {:.4f}, nobj_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
         step, hyper_params['epochs'], 
         box_loss.numpy(), obj_loss.numpy(), nobj_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
     ))
