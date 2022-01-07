@@ -13,10 +13,10 @@ anchors3 = box_prior[0:3] # 52, 52
 anchors = [anchors3, anchors2, anchors1]
 
 hyper_params = {
-    "batch_size" : 4,
+    "batch_size" : 16,
     "img_size" : 416,
     "total_class" : 80,
-    "epochs" : 10000,
+    "iterations" : 10000,
 }
 
 #%%
@@ -42,39 +42,34 @@ def train_step(images, gt_boxes, gt_labels, box_prior, hyper_params):
 name = "validation"
 data_dir = r"C:\won\data\coco"
 sample = tf.data.TFRecordDataset(f"{data_dir}/{name}.tfrecord".encode("utf-8")).map(data.deserialize_example)
-sample = sample.prefetch(tf.data.experimental.AUTOTUNE)
-sample = sample.shuffle(buffer_size=5000, reshuffle_each_iteration=True)
+# sample = sample.shuffle(buffer_size=5000, reshuffle_each_iteration=True)
 padding_values = (tf.constant(0, tf.float32), tf.constant(0, tf.float32), tf.constant(-1, tf.int64))
 data_shapes = ([None, None, None], [None, None], [None,])
-dataset = sample.padded_batch(4, data_shapes, padding_values, drop_remainder=True)
-
+sample = sample.repeat().padded_batch(hyper_params["batch_size"], data_shapes, padding_values, drop_remainder=True)
+dataset = sample.prefetch(tf.data.experimental.AUTOTUNE)
+data_generator = iter(dataset)
 # %%
 step = 0
-progress_bar = range(hyper_params['epochs'])
-# progress_bar.set_description('epoch {}/{} | current loss ?'.format(step, hyper_params['epochs']))
+progress_bar = tqdm(range(hyper_params['iterations']))
+progress_bar.set_description('Iterations {}/{} | current loss ?'.format(step, hyper_params['iterations']))
 
 start_time = time.time()
 for _ in progress_bar:
-    
-    for images, gt_boxes, gt_labels in dataset:
-        break
-    # print("\n DATA LOADED.")
+    images, gt_boxes, gt_labels = next(data_generator)
     box_loss, obj_loss, nobj_loss, cls_loss, total_loss = train_step(images, gt_boxes, gt_labels, box_prior, hyper_params)
 
     step += 1
-    print('epoch {}/{} | box_loss {:.4f}, obj_loss {:.4f}, nobj_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
-        step, hyper_params['epochs'], 
+    progress_bar.set_description('Iterations {}/{} | box_loss {:.4f}, obj_loss {:.4f}, nobj_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
+        step, hyper_params['iterations'], 
         box_loss.numpy(), obj_loss.numpy(), nobj_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
-    ))
+    )) 
     
-    # progress_bar.set_description('epoch {}/{} | box_loss {:.4f}, obj_loss {:.4f}, nobj_loss {:.4f}, loss {:.4f}'.format(
-    #     step, hyper_params['epoch'], 
-    #     box_loss.numpy(), obj_loss.numpy(), nobj_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
-    # )) 
-    
-yolo.save_weights(data_dir + r'\yolo_weights\weights')
+    if step % 1000 == 0 : 
+        print(progress_bar.set_description('Iterations {}/{} | box_loss {:.4f}, obj_loss {:.4f}, nobj_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
+            step, hyper_params['iterations'], 
+            box_loss.numpy(), obj_loss.numpy(), nobj_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
+        )))
+        yolo.save_weights(data_dir + r'\yolo_weights\weights')
 
 print("Time taken: %.2fs" % (time.time() - start_time))
-# %%
-
 # %%
