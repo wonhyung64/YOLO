@@ -165,43 +165,35 @@ def yolo_v3(input_shape, hyper_params, anchors):
     outputs = Head(anchors, hyper_params)(head)
 
     return Model(inputs=inputs, outputs=outputs)
-# model = yolo_v3((416, 416, 3))
-# model.summary()
-# model.output
-
 #%%
-# hyper_params = {
-#     "total_anchors" : 3,
-#     "total_class" : 80,
-#     "img_size" : 416
-# }
-# class YOLOv3(Model):
-#     def __init__(self, hyper_params):
-#         super(YOLOv3, self).__init__()
-#         self.hyper_params = hyper_params
-#         self.base_model = DarkNet53(include_top=False, inputs_shape=(hyper_params["img_size"], hyper_params["img_size"], 3))
-#         self.conv = Conv2D(3 * (5 + 80), 1, 1, bias_initializer=tf.zeros_initializer)
-#         self.upsample = UpSampling2D(2)
-#         self.concat = Concatenate()
-#         yolo_block
-#         conv_block
+'''
+class YOLOv3(Model):
+    def __init__(self, hyper_params):
+        super(YOLOv3, self).__init__()
+        self.hyper_params = hyper_params
+        self.base_model = DarkNet53(include_top=False, inputs_shape=(hyper_params["img_size"], hyper_params["img_size"], 3))
+        self.conv = Conv2D(3 * (5 + 80), 1, 1, bias_initializer=tf.zeros_initializer)
+        self.upsample = UpSampling2D(2)
+        self.concat = Concatenate()
+        yolo_block
+        conv_block
 
-#     def call(self, inputs):
-#         x = self.base_model(inputs)
+    def call(self, inputs):
+        x = self.base_model(inputs)
         
-#         head1, p1 = yolo_block(self.base_model.output[2], 512)
-#         head1 = self.conv(head1)
-#         p1 = conv_block(256, 1)(p1)
-#         p1 = self.upsample(2)(p1)
-#         concat1 = self.concat([p1, self.base_model.output[1]])
-#         head2, p2 = yolo_block(concat1, 256)
-#         head2 = self.conv(head2)
-#         p2 = conv_block(128, 1)(p2)
-#         p2 = self.upsample(p2)
-#         concat2 = self.concat([p2, self.base_model.output[0]])
-#         head3, _ = yolo_block(concat2, 128)
-#         head3 = self.conv(head3)
-#         return [head1, head2, head3]
-
+        head1, p1 = yolo_block(self.base_model.output[2], 512)
+        head1 = self.conv(head1)
+        p1 = conv_block(256, 1)(p1)
+        p1 = self.upsample(2)(p1)
+        concat1 = self.concat([p1, self.base_model.output[1]])
+        head2, p2 = yolo_block(concat1, 256)
+        head2 = self.conv(head2)
+        p2 = conv_block(128, 1)(p2)
+        p2 = self.upsample(p2)
+        concat2 = self.concat([p2, self.base_model.output[0]])
+        head3, _ = yolo_block(concat2, 128)
+        head3 = self.conv(head3)
+        return [head1, head2, head3]
+'''
 
 
