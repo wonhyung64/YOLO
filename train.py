@@ -3,21 +3,16 @@ import time
 from tqdm import tqdm
 import tensorflow as tf
 import numpy as np
-import model, data, loss, target
+import model, data, loss, target, utils
 
+hyper_params = utils.get_hyper_params()
+hyper_params["batch_size"] = 16
 #%%
 box_prior = np.array([[10,13], [16,30], [33,23], [30,61], [62,45], [59,119], [116,90],  [156,198],  [373,326]], dtype = np.float32)
 anchors1 = box_prior[6:9] # 13,13
 anchors2 = box_prior[3:6] # 26, 26
 anchors3 = box_prior[0:3] # 52, 52
 anchors = [anchors3, anchors2, anchors1]
-
-hyper_params = {
-    "batch_size" : 16,
-    "img_size" : 416,
-    "total_class" : 80,
-    "iterations" : 10000,
-}
 
 #%%
 yolo = model.yolo_v3((416, 416, 3), hyper_params, anchors)
