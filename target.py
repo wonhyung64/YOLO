@@ -6,6 +6,8 @@ import tensorflow as tf
 def generate_target(inputs, box_prior, hyper_params):
     batch_size = hyper_params["batch_size"]
     img_size = hyper_params["img_size"]
+    total_class = hyper_params["total_class"]
+
     y_13_lst, y_26_lst, y_52_lst = [], [], []
     for j in range(batch_size):
         gt_box = inputs[0][j] * img_size
@@ -14,9 +16,9 @@ def generate_target(inputs, box_prior, hyper_params):
         gt_ctr = (gt_box[:,:2] + gt_box[:,2:])/2 # x y
         gt_size = gt_box[:,2:] - gt_box[:,:2] # w h
 
-        y_true_13 = np.zeros((13, 13, 3, 85), np.float32)
-        y_true_26 = np.zeros((26, 26, 3, 85), np.float32)
-        y_true_52 = np.zeros((52, 52, 3, 85), np.float32)
+        y_true_13 = np.zeros((13, 13, 3, 5 + total_class), np.float32)
+        y_true_26 = np.zeros((26, 26, 3, 5 + total_class), np.float32)
+        y_true_52 = np.zeros((52, 52, 3, 5 + total_class), np.float32)
         y_true = [y_true_13, y_true_26, y_true_52]
 
         gt_size = tf.expand_dims(gt_size, 1)
@@ -47,9 +49,9 @@ def generate_target(inputs, box_prior, hyper_params):
             y_true[feature_map_group][y, x, k, 4] = 1.              # obj (0 ,1)
             y_true[feature_map_group][y, x, k, 5+c] = 1.            # cls (one-hot)
 
-        y_13_lst.append(tf.reshape(y_true[0], (1, 13, 13, 3, 85)))
-        y_26_lst.append(tf.reshape(y_true[1], (1, 26, 26, 3, 85)))
-        y_52_lst.append(tf.reshape(y_true[2], (1, 52, 52, 3, 85)))
+        y_13_lst.append(tf.reshape(y_true[0], (1, 13, 13, 3, 5 + total_class)))
+        y_26_lst.append(tf.reshape(y_true[1], (1, 26, 26, 3, 5 + total_class)))
+        y_52_lst.append(tf.reshape(y_true[2], (1, 52, 52, 3, 5 + total_class)))
 
     y_true = [tf.concat(y_13_lst, axis=0), tf.concat(y_26_lst, axis=0), tf.concat(y_52_lst, axis=0)]
 

@@ -4,10 +4,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 #%%
-data_dir = r"C:\won\data\coco"
-def download_dataset(dataset_name):
-    train = None
-    test = None
+def download_dataset(dataset_name, data_dir):
 
     if dataset_name == "coco17":
         dataset = tfds.load(name="coco/2017", data_dir=data_dir)
@@ -80,14 +77,3 @@ def deserialize_example(serialized_string):
     return image, bbox, label
 
 #%%
-
-# train, validation, test = download_dataset("coco17")
-# # for name, datasets in [("train", train), ("validation", validation), ("test", test)]:
-# for name, datasets in [("validation", validation)]:
-#     writer = tf.io.TFRecordWriter(f"{data_dir}/{name}.tfrecord".encode("utf-8"))
-#     for i in datasets:
-#         example = {"image":i["image"]/255, "bbox":i["objects"]["bbox"], "label":i["objects"]["label"]}
-#         x = serialize_example(example)
-#         writer.write(x)
-
-# %%

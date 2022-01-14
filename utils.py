@@ -7,10 +7,12 @@ def get_hyper_params():
     hyper_params = {
         "img_size" : 416,
         "total_class" : 80,
-        "iterations" : 10000,
+        "iterations" : 30000,
         "nms_boxes_per_class" : 50,
         "score_thresh" : 0.5,
-        "nms_thresh" : 0.5
+        "nms_thresh" : 0.5,
+        "coord_tune" : 5.,
+        "noobj_tune" : .5
     }
     return hyper_params
 #%%
@@ -56,7 +58,6 @@ def nms(pred, hyper_params):
     score = tf.concat(score_lst, axis=0)
 
     return box, score, label
-# %%
 #%%
 def draw(images, box, score, label, hyper_params):
         image = tf.squeeze(images, axis=0)
