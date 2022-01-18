@@ -35,3 +35,4 @@ for i in range(30):
     pred = yolo(images)
     box, score, label = utils.nms(pred, hyper_params)
     utils.draw(images, box, score, label, hyper_params)
+# %%
