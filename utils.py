@@ -7,7 +7,7 @@ def get_hyper_params():
     hyper_params = {
         "img_size" : 416,
         "total_class" : 80,
-        "iterations" : 30000,
+        "iterations" : 20000,
         "nms_boxes_per_class" : 50,
         "score_thresh" : 0.5,
         "nms_thresh" : 0.5,

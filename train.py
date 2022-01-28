@@ -16,7 +16,7 @@ anchors = [anchors3, anchors2, anchors1]
 
 #%%
 yolo = model.yolo_v3((416, 416, 3), hyper_params, anchors)
-optimizer = tf.keras.optimizers.SGD(learning_rate=1e-5)
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 #%%
 def generate_ignore_mask(true, pred):
     pred_boxes = pred[...,0:4]
@@ -88,10 +88,10 @@ def train_step(images, gt_boxes, gt_labels, box_prior, hyper_params):
     return box_loss, obj_loss, nobj_loss, cls_loss, total_loss
 
 # %%
-name = "train_10000"
-data_dir = r"D:\won\coco_tfrecord"
+name = "train"
+data_dir = r"D:\won\data\coco17_tfrecord_416_416"
 sample = tf.data.TFRecordDataset(f"{data_dir}/{name}.tfrecord".encode("utf-8")).map(data.deserialize_example)
-sample = sample.shuffle(buffer_size=10000, reshuffle_each_iteration=False)
+# sample = sample.shuffle(buffer_size=10000, reshuffle_each_iteration=False)
 padding_values = (tf.constant(0, tf.float32), tf.constant(0, tf.float32), tf.constant(-1, tf.int64))
 data_shapes = ([None, None, None], [None, None], [None,])
 sample = sample.repeat().padded_batch(hyper_params["batch_size"], data_shapes, padding_values, drop_remainder=True)
