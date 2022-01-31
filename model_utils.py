@@ -40,7 +40,7 @@ def res_block(inputs, num):
 def output_to_pred(head, anchors, hyper_params):
     batch_size = hyper_params["batch_size"]
     img_size = hyper_params["img_size"]
-    total_class = hyper_params["total_class"]
+    total_class = hyper_params["total_labels"]
 
     grid_size = [head.shape[1], head.shape[2]]
     grid_cell = generate_grid_cell(grid_size[0], grid_size[1])
@@ -101,7 +101,7 @@ class Head(Layer):
         y1 = y_ctr - height/2
         x2 = x_ctr + width/2
         y2 = y_ctr + height/2
-        boxes = tf.concat([x1, y1, x2, y2], axis=-1)
+        boxes = tf.concat([y1, x1, y2, x2], axis=-1)
 
         confs = tf.concat(obj_lst, axis=1)
         confs = tf.reshape(confs, [confs.shape[0], confs.shape[1] * confs.shape[2], -1])

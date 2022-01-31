@@ -2,11 +2,12 @@
 import numpy as np
 import tensorflow as tf
 
+import bbox_utils
 #%%
 def generate_target(inputs, box_prior, hyper_params):
     batch_size = hyper_params["batch_size"]
     img_size = hyper_params["img_size"]
-    total_class = hyper_params["total_class"]
+    total_class = hyper_params["total_labels"]
 
     y_13_lst, y_26_lst, y_52_lst = [], [], []
     for j in range(batch_size):
@@ -60,3 +61,28 @@ def generate_target(inputs, box_prior, hyper_params):
     true_3 = tf.reshape(y_true[2], (y_true[2].shape[0], y_true[2].shape[1] * y_true[2].shape[2] * y_true[2].shape[3], -1))
 
     return tf.concat([true_1, true_2, true_3], axis=1)
+#%%
+def generate_ignore_mask(true, pred):
+    pred_boxes = pred[...,0:4]
+    object_mask = true[..., 4:5]
+
+    batch_size = pred_boxes.shape[0]
+    ignore_mask = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
+
+    def loop_cond(idx, ignore_mask):
+        return tf.less(idx, tf.cast(batch_size, tf.int32))
+    def loop_body(idx, ignore_mask):
+        valid_true_boxes = tf.boolean_mask(true[idx, ..., 0:4], tf.cast(object_mask[idx, ..., 0], "bool"))
+
+        iou = bbox_utils.bbox_iou(pred_boxes[idx], valid_true_boxes)
+
+        best_iou = tf.reduce_max(iou, axis=-1)
+        ignore_mask_tmp = tf.cast(best_iou < 0.5, tf.float32)
+        ignore_mask = ignore_mask.write(idx, ignore_mask_tmp)
+        return idx+1, ignore_mask
+
+    _, ignore_mask = tf.while_loop(cond=loop_cond, body=loop_body, loop_vars=[0, ignore_mask])
+    ignore_mask = ignore_mask.stack()
+    # ignore_mask = tf.expand_dims(ignore_mask, -1)
+
+    return ignore_mask
