@@ -4,6 +4,7 @@ import tensorflow as tf
 
 import bbox_utils
 #%%
+
 def generate_target(inputs, box_prior, hyper_params):
     batch_size = hyper_params["batch_size"]
     img_size = hyper_params["img_size"]
@@ -14,8 +15,8 @@ def generate_target(inputs, box_prior, hyper_params):
         gt_box = inputs[0][j] * img_size
         gt_label = inputs[1][j]
 
-        gt_ctr = (gt_box[:,:2] + gt_box[:,2:])/2 # x y
-        gt_size = gt_box[:,2:] - gt_box[:,:2] # w h
+        gt_ctr = (gt_box[...,:2] + gt_box[...,2:])/2 # x y
+        gt_size = gt_box[...,2:] - gt_box[...,:2] # w h
 
         y_true_13 = np.zeros((13, 13, 3, 5 + total_class), np.float32)
         y_true_26 = np.zeros((26, 26, 3, 5 + total_class), np.float32)

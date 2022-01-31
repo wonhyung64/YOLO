@@ -92,7 +92,7 @@ def read_labels(label_dir):
 #%%
 def fetch_dataset(dataset, split, img_size, data_dir=r"C:\won", save_dir=r"D:\won"):
 
-    save_dir = save_dir + r"\data\\" + dataset + "_tfrecord_" + str(img_size[0]) + "_" + str(img_size[1])
+    save_dir = save_dir + "/data/" + dataset + "_tfrecord_" + str(img_size[0]) + "_" + str(img_size[1])
     if os.path.exists(save_dir) == False:
         os.mkdir(save_dir)
 
