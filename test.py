@@ -33,7 +33,7 @@ anchors = [anchors3, anchors2, anchors1]
 
 #%%
 weights_dir = os.getcwd() + "/atmp"
-weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-2]
+weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]
 
 input_shape = (416, 416, 3)
 yolo_model = model_utils.yolo_v3(input_shape, hyper_params, anchors)
@@ -54,7 +54,7 @@ for _ in progress_bar:
     final_bboxes, final_labels, final_scores = postprocessing_utils.Decode(pred, hyper_params)
     time_ = float(time.time() - start_time)*1000
     AP = test_utils.calculate_AP(final_bboxes, final_labels, gt_boxes, gt_labels, hyper_params)
-    # test_utils.draw_yolo_output(img, final_bboxes, labels, final_labels, final_scores)
+    test_utils.draw_yolo_output(img, final_bboxes, labels, final_labels, final_scores)
     total_time.append(time_)
     mAP.append(AP)
 
