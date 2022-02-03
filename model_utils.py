@@ -40,7 +40,7 @@ def res_block(inputs, num):
 def output_to_pred(head, anchors, hyper_params):
     batch_size = hyper_params["batch_size"]
     img_size = hyper_params["img_size"]
-    total_class = hyper_params["total_labels"]
+    total_labels = hyper_params["total_labels"]
 
     grid_size = [head.shape[1], head.shape[2]]
     grid_cell = generate_grid_cell(grid_size[0], grid_size[1])
@@ -48,8 +48,8 @@ def output_to_pred(head, anchors, hyper_params):
     ratio = tf.cast(img_size / grid_size[0], tf.float32)
     scaled_anchors = [(anchor[0]/ratio, anchor[1]/ratio) for anchor in anchors]
 
-    head = tf.reshape(head, [batch_size, grid_size[0], grid_size[1], 3, 5 + total_class])
-    box_ctr_, box_size_, box_obj_, box_cls_ = tf.split(head, [2, 2, 1, total_class], axis=-1)
+    head = tf.reshape(head, [batch_size, grid_size[0], grid_size[1], 3, 5 + total_labels])
+    box_ctr_, box_size_, box_obj_, box_cls_ = tf.split(head, [2, 2, 1, total_labels], axis=-1)
 
     box_ctr = tf.nn.sigmoid(box_ctr_)
 
@@ -66,7 +66,7 @@ def output_to_pred(head, anchors, hyper_params):
     box_obj = tf.reshape(box_obj, [batch_size, grid_size[0] * grid_size[1], 3, 1])
 
     box_cls = tf.sigmoid(box_cls_)
-    box_cls = tf.reshape(box_cls, [batch_size, grid_size[0] * grid_size[1], 3, total_class])
+    box_cls = tf.reshape(box_cls, [batch_size, grid_size[0] * grid_size[1], 3, total_labels])
     return box_coor, box_obj, box_cls
 
 #%%
@@ -146,21 +146,22 @@ def yolo_block(inputs, filters):
 #%%
 def yolo_v3(input_shape, hyper_params, anchors):
     base_model = DarkNet53(include_top=False, input_shape=input_shape)
+    total_labels = hyper_params["total_labels"]
 
     inputs = base_model.input
 
     head1, p1 = yolo_block(base_model.output[2], 512)
-    head1 = Conv2D(3 * (5 + 80), 1, 1, bias_initializer=tf.zeros_initializer)(head1)
+    head1 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head1)
     p1 = conv_block(256, 1)(p1)
     p1 = UpSampling2D(2)(p1)
     concat1 = Concatenate()([p1, base_model.output[1]])
     head2, p2 = yolo_block(concat1, 256)
-    head2 = Conv2D(3 * (5 + 80), 1, 1, bias_initializer=tf.zeros_initializer)(head2)
+    head2 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head2)
     p2 = conv_block(128, 1)(p2)
     p2 = UpSampling2D(2)(p2)
     concat2 = Concatenate()([p2, base_model.output[0]])
     head3, _ = yolo_block(concat2, 128)
-    head3 = Conv2D(3 * (5 + 80), 1, 1, bias_initializer=tf.zeros_initializer)(head3)
+    head3 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head3)
     head = [head1, head2, head3]
     outputs = Head(anchors, hyper_params)(head)
 

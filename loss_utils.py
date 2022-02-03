@@ -36,3 +36,10 @@ def cls_loss(pred, true):
     obj_mask = true[..., 4]
     return -tf.reduce_mean(tf.reduce_mean(cls_true * tf.math.log(cls_pred) + (1 - cls_true) * tf.math.log(tf.clip_by_value(1 - cls_pred, 1e-9, 1e+9)), axis=-1) * obj_mask) * tf.constant(100.)
 #%%
+
+
+
+'''
+obj loss, noobj loss, cls loss => cls sum => grid sum => batch mean
+box loss tune param 으로만 loss 크기 수정
+'''
