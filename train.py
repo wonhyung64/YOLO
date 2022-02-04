@@ -54,6 +54,7 @@ def train_step(img, gt_boxes, gt_labels, box_prior, hyper_params):
         total_loss = box_loss + obj_loss + nobj_loss + cls_loss
     grads = tape.gradient(total_loss, yolo_model.trainable_weights)
     optimizer.apply_gradients(zip(grads, yolo_model.trainable_weights))
+    
     return box_loss, obj_loss, nobj_loss, cls_loss, total_loss
 
 # %%
@@ -68,6 +69,7 @@ start_time = time.time()
 for _ in progress_bar:
     img, gt_boxes, gt_labels = next(dataset)
     box_loss, obj_loss, nobj_loss, cls_loss, total_loss = train_step(img, gt_boxes, gt_labels, box_prior, hyper_params)
+    if total_loss.dtype != tf.float32 :  break
 
     step += 1
 
@@ -92,7 +94,7 @@ utils.save_dict_to_file(hyper_params, atmp_dir + '/hyper_params')
 #%%test
 hyper_params["batch_size"] = batch_size = 1
 
-dataset, _ = data_utils.fetch_dataset("coco17", "test", img_size)
+dataset, _ = data_utils.fetch_dataset("coco17", "train", img_size)
 
 dataset = dataset.map(lambda x, y, z: preprocessing_utils.preprocessing(x, y, z))
 dataset = dataset.repeat().padded_batch(batch_size, padded_shapes=data_shapes, padding_values=padding_values)
