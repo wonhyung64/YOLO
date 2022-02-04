@@ -45,3 +45,13 @@ def generate_iou(anchors, gt_boxes):
     union_area = (tf.expand_dims(bbox_area, -1) + tf.expand_dims(gt_area, 1) - intersection_area)
     
     return intersection_area / union_area 
+
+#%%
+def xywh_to_bbox(boxes):
+    x_ctr, y_ctr, width, height = tf.split(boxes, [1,1,1,1], axis=-1)
+    x1 = x_ctr - width/2
+    y1 = y_ctr - height/2
+    x2 = x_ctr + width/2
+    y2 = y_ctr + height/2
+    boxes = tf.concat([y1, x1, y2, x2], axis=-1)
+    return boxes

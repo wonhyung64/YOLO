@@ -29,6 +29,7 @@ class conv_block(Layer):
             tensor = self.bn(tensor)
             tensor = self.ac(tensor)
         return tensor
+
 #%%
 def res_block(inputs, num):
     for _ in range(num):
@@ -36,6 +37,39 @@ def res_block(inputs, num):
         x = conv_block(inputs.shape[-1], 3)(x)
         x = Add()([inputs, x])
     return x
+
+#%%
+def DarkNet53(include_top=True, input_shape=(None, None, 3)):
+
+    input_x = Input(shape=input_shape)
+    x = conv_block(32, 3, name="conv1")(input_x)
+    x = conv_block(64, 3, 2, name="conv2")(x)
+    x = res_block(x, 1)
+    x = conv_block(128, 3, 2, name="conv3")(x)
+    x = res_block(x, 2)
+    x = conv_block(256, 3, 2, name="conv4")(x)
+    x = c3 = res_block(x, 8)
+    x = conv_block(512, 3, 2, name="conv5")(x)
+    x = c2 = res_block(x, 8)
+    x = conv_block(1024, 3, 2, name="conv6")(x)
+    x = c1 = res_block(x, 4)
+    if include_top == False:
+        return Model(inputs=input_x, outputs=[c3, c2, c1])
+    x = GlobalAveragePooling2D(name="avgpooling")(x)
+    output_x = Dense(1000, activation="softmax", name="fc")(x)
+    return Model(inputs=input_x, outputs=output_x)
+
+#%%
+def generate_grid_cell(x_grid_size, y_grid_size):
+    grid_x = tf.range(x_grid_size, dtype=tf.int32)
+    grid_y = tf.range(y_grid_size, dtype=tf.int32)
+    grid_x, grid_y = tf.meshgrid(grid_x, grid_y)
+    flat_grid_x = tf.reshape(grid_x, (-1, 1))
+    flat_grid_y = tf.reshape(grid_y, (-1, 1))
+    flat_grid_cell = tf.concat([flat_grid_x, flat_grid_y], axis=-1)
+    grid_cell = tf.cast(tf.reshape(flat_grid_cell, [x_grid_size, y_grid_size, 1, 2]), tf.float32)
+    return grid_cell
+
 #%%
 def output_to_pred(head, anchors, hyper_params):
     batch_size = hyper_params["batch_size"]
@@ -69,16 +103,7 @@ def output_to_pred(head, anchors, hyper_params):
     box_cls = tf.reshape(box_cls, [batch_size, grid_size[0] * grid_size[1], 3, total_labels])
     return box_coor, box_obj, box_cls
 
-#%%
-def generate_grid_cell(x_grid_size, y_grid_size):
-    grid_x = tf.range(x_grid_size, dtype=tf.int32)
-    grid_y = tf.range(y_grid_size, dtype=tf.int32)
-    grid_x, grid_y = tf.meshgrid(grid_x, grid_y)
-    flat_grid_x = tf.reshape(grid_x, (-1, 1))
-    flat_grid_y = tf.reshape(grid_y, (-1, 1))
-    flat_grid_cell = tf.concat([flat_grid_x, flat_grid_y], axis=-1)
-    grid_cell = tf.cast(tf.reshape(flat_grid_cell, [x_grid_size, y_grid_size, 1, 2]), tf.float32)
-    return grid_cell
+
 #%%
 class Head(Layer):
     def __init__(self, anchors, hyper_params, **kwargs):
@@ -96,12 +121,12 @@ class Head(Layer):
             
         boxes = tf.concat(coor_lst, axis=1)
         boxes = tf.reshape(boxes, [boxes.shape[0], boxes.shape[1] * boxes.shape[2], -1])
-        x_ctr, y_ctr, width, height = tf.split(boxes, [1,1,1,1], axis=-1)
-        x1 = x_ctr - width/2
-        y1 = y_ctr - height/2
-        x2 = x_ctr + width/2
-        y2 = y_ctr + height/2
-        boxes = tf.concat([y1, x1, y2, x2], axis=-1)
+        # x_ctr, y_ctr, width, height = tf.split(boxes, [1,1,1,1], axis=-1)
+        # x1 = x_ctr - width/2
+        # y1 = y_ctr - height/2
+        # x2 = x_ctr + width/2
+        # y2 = y_ctr + height/2
+        # boxes = tf.concat([y1, x1, y2, x2], axis=-1)
 
         confs = tf.concat(obj_lst, axis=1)
         confs = tf.reshape(confs, [confs.shape[0], confs.shape[1] * confs.shape[2], -1])
@@ -111,27 +136,6 @@ class Head(Layer):
 
         pred = tf.concat([boxes, confs, probs], axis=-1)
         return pred
-
-#%%
-def DarkNet53(include_top=True, input_shape=(None, None, 3)):
-
-    input_x = Input(shape=input_shape)
-    x = conv_block(32, 3, name="conv1")(input_x)
-    x = conv_block(64, 3, 2, name="conv2")(x)
-    x = res_block(x, 1)
-    x = conv_block(128, 3, 2, name="conv3")(x)
-    x = res_block(x, 2)
-    x = conv_block(256, 3, 2, name="conv4")(x)
-    x = c3 = res_block(x, 8)
-    x = conv_block(512, 3, 2, name="conv5")(x)
-    x = c2 = res_block(x, 8)
-    x = conv_block(1024, 3, 2, name="conv6")(x)
-    x = c1 = res_block(x, 4)
-    if include_top == False:
-        return Model(inputs=input_x, outputs=[c3, c2, c1])
-    x = GlobalAveragePooling2D(name="avgpooling")(x)
-    output_x = Dense(1000, activation="softmax", name="fc")(x)
-    return Model(inputs=input_x, outputs=output_x)
 
 #%%
 def yolo_block(inputs, filters):
@@ -166,4 +170,3 @@ def yolo_v3(input_shape, hyper_params, anchors):
     outputs = Head(anchors, hyper_params)(head)
 
     return Model(inputs=inputs, outputs=outputs)
-#%%

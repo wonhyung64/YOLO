@@ -1,5 +1,6 @@
 #%%
 import tensorflow as tf
+import bbox_utils
 
 #%%
 def Decode(pred, hyper_params):
@@ -10,11 +11,7 @@ def Decode(pred, hyper_params):
 
     pred = tf.squeeze(pred, axis=0)
     box = pred[...,:4]
-    x1 = box[...,0] - box[...,2]/2
-    x2 = box[...,0] + box[...,2]/2
-    y1 = box[...,1] - box[...,3]/2
-    y2 = box[...,1] + box[...,3]/2
-    box = tf.stack([y1, x1, y2, x2], axis=-1)
+    box = bbox_utils.xywh_to_bbox(box)
     box = tf.clip_by_value(box, 0, hyper_params["img_size"])
 
     obj = pred[...,4:5]
