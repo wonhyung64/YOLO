@@ -1,8 +1,18 @@
 #%%
 import numpy as np
 import tensorflow as tf
+
+import target_utils
 #%%
 def preprocessing(img, gt_boxes, gt_labels):# resize, flip_left_right
+    gt_labels = tf.cast(gt_labels, tf.int32)
+    if (np.random.uniform(0,1,1) > 0.5) == True:
+        img, gt_boxes = flip_horizontal(img, gt_boxes)
+
+    y_true = target_utils.calculate_target(gt_boxes, gt_labels)
+    return img, y_true
+
+def preprocessing_ship(img, gt_boxes, gt_labels, filenames=None):# resize, flip_left_right
     gt_labels = tf.cast(gt_labels, tf.int32)
     if (np.random.uniform(0,1,1) > 0.5) == True:
         img, gt_boxes = flip_horizontal(img, gt_boxes)

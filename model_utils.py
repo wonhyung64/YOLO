@@ -86,21 +86,20 @@ def output_to_pred(head, anchors, hyper_params):
     box_ctr_, box_size_, box_obj_, box_cls_ = tf.split(head, [2, 2, 1, total_labels], axis=-1)
 
     box_ctr = tf.nn.sigmoid(box_ctr_)
-
     box_ctr = box_ctr + grid_cell
     box_ctr = box_ctr * ratio # rescale to img size
-
     box_size = tf.exp(box_size_) * scaled_anchors
     box_size = box_size * ratio
-
     box_coor = tf.concat([box_ctr, box_size], axis=-1) # x y w h
-    box_coor = tf.reshape(box_coor, [batch_size, grid_size[0] * grid_size[1], 3, 4])
 
-    box_obj = tf.sigmoid(box_obj_)
+    box_obj = tf.nn.sigmoid(box_obj_)
+    box_cls = tf.nn.sigmoid(box_cls_)
+
+    # flatten
+    box_coor = tf.reshape(box_coor, [batch_size, grid_size[0] * grid_size[1], 3, 4]) 
     box_obj = tf.reshape(box_obj, [batch_size, grid_size[0] * grid_size[1], 3, 1])
-
-    box_cls = tf.sigmoid(box_cls_)
     box_cls = tf.reshape(box_cls, [batch_size, grid_size[0] * grid_size[1], 3, total_labels])
+
     return box_coor, box_obj, box_cls
 
 
@@ -121,12 +120,6 @@ class Head(Layer):
             
         boxes = tf.concat(coor_lst, axis=1)
         boxes = tf.reshape(boxes, [boxes.shape[0], boxes.shape[1] * boxes.shape[2], -1])
-        # x_ctr, y_ctr, width, height = tf.split(boxes, [1,1,1,1], axis=-1)
-        # x1 = x_ctr - width/2
-        # y1 = y_ctr - height/2
-        # x2 = x_ctr + width/2
-        # y2 = y_ctr + height/2
-        # boxes = tf.concat([y1, x1, y2, x2], axis=-1)
 
         confs = tf.concat(obj_lst, axis=1)
         confs = tf.reshape(confs, [confs.shape[0], confs.shape[1] * confs.shape[2], -1])

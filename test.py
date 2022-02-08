@@ -14,10 +14,17 @@ hyper_params = utils.get_hyper_params()
 
 hyper_params["batch_size"] = batch_size = 1
 img_size = (hyper_params["img_size"], hyper_params["img_size"])
+dataset_name = hyper_params["dataset_name"]
 
-dataset, labels = data_utils.fetch_dataset("coco17", "test", img_size)
+if dataset_name == "ship":
+    import ship
+    dataset, labels = ship.fetch_dataset(dataset_name, "train", img_size, save_dir="/home1/wonhyung64")
+    dataset = dataset.map(lambda x, y, z, w: preprocessing_utils.preprocessing_ship(x, y, z, w))
+else:
+    import data_utils
+    dataset, labels = data_utils.fetch_dataset(dataset_name, "train", img_size, save_dir="/home1/wonhyung64")
+    dataset = dataset.map(lambda x, y, z: preprocessing_utils.preprocessing(x, y, z))
 
-dataset = dataset.map(lambda x, y, z: preprocessing_utils.preprocessing(x, y, z))
 data_shapes = ([None, None, None], [None, None], [None])
 padding_values = (tf.constant(0, tf.float32), tf.constant(0, tf.float32), tf.constant(-1, tf.int32))
 dataset = dataset.repeat().padded_batch(batch_size, padded_shapes=data_shapes, padding_values=padding_values)

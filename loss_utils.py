@@ -4,14 +4,14 @@ import tensorflow as tf
 def box_loss(pred, true, tune_param):
     tune_param = tf.constant(tune_param)
 
-    xy_pred = tf.clip_by_value(pred[...,:2], 1e-9, 1e+9)
-    wh_pred = tf.clip_by_value(pred[...,2:4], 1e-9, 1e+9)
+    xy_pred = pred[...,:2]
+    wh_pred = pred[...,2:4]
     xy_true = true[...,:2]
     wh_true = true[...,2:4]
     obj_mask = true[...,4]
     
-    xy_loss = tf.reduce_mean(tf.square(xy_pred - xy_true), axis=-1)
-    wh_loss = tf.reduce_mean(tf.square(wh_pred - wh_true), axis=-1)
+    xy_loss = tf.reduce_mean(tf.clip_by_value(tf.square(xy_pred - xy_true), 1e-9, 1e+9), axis=-1)
+    wh_loss = tf.reduce_mean(tf.clip_by_value(tf.square(wh_pred - wh_true), 1e-9, 1e+9), axis=-1)
 
     return tf.reduce_mean((xy_loss + wh_loss) * obj_mask) * tune_param
 

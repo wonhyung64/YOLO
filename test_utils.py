@@ -28,8 +28,8 @@ def draw_yolo_output(image, final_bboxes, labels, final_labels, final_scores, sa
         width = x2 - x1
         height = y2 - y1
 
-        final_labels_ = tf.reshape(final_labels[0], shape=(200,))
-        final_scores_ = tf.reshape(final_scores[0], shape=(200,))
+        final_labels_ = tf.reshape(final_labels[0], shape=(final_labels.shape[1],))
+        final_scores_ = tf.reshape(final_scores[0], shape=(final_scores.shape[1],))
         label_index = int(final_labels_[index])
         color = tuple(colors[label_index].numpy())
         label_text = "{0} {1:0.3f}".format(labels[label_index], final_scores_[index])
@@ -39,7 +39,7 @@ def draw_yolo_output(image, final_bboxes, labels, final_labels, final_scores, sa
     if save_dir != None:    
         plt.figure(figsize=(10,10))
         plt.imshow(image)
-        plt.savefig(save_dir + '/res_yolo/' + str(save_num) + '.png')
+        plt.savefig(save_dir + '/yolo_output/' + str(save_num) + '.png')
 
     else:
         plt.figure(figsize=(10, 10))
