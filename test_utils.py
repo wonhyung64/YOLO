@@ -10,13 +10,12 @@ def draw_yolo_output(image, final_bboxes, labels, final_labels, final_scores, sa
 
     image = tf.squeeze(image, axis=0)
     image = tf.keras.preprocessing.image.array_to_img(image)
-    width, height = image.size
     draw = ImageDraw.Draw(image)
 
-    y1 = final_bboxes[0][...,0] * height
-    x1 = final_bboxes[0][...,1] * width
-    y2 = final_bboxes[0][...,2] * height
-    x2 = final_bboxes[0][...,3] * width
+    y1 = final_bboxes[0][...,0]
+    x1 = final_bboxes[0][...,1]
+    y2 = final_bboxes[0][...,2]
+    x2 = final_bboxes[0][...,3]
 
     denormalized_box = tf.round(tf.stack([y1, x1, y2, x2], axis=-1))
 

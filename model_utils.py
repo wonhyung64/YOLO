@@ -48,11 +48,11 @@ def DarkNet53(include_top=True, input_shape=(None, None, 3)):
     x = conv_block(128, 3, 2, name="conv3")(x)
     x = res_block(x, 2)
     x = conv_block(256, 3, 2, name="conv4")(x)
-    x = c3 = res_block(x, 8)
+    x = c3 = res_block(x, 8) # 52
     x = conv_block(512, 3, 2, name="conv5")(x)
-    x = c2 = res_block(x, 8)
+    x = c2 = res_block(x, 8) # 26
     x = conv_block(1024, 3, 2, name="conv6")(x)
-    x = c1 = res_block(x, 4)
+    x = c1 = res_block(x, 4) # 13
     if include_top == False:
         return Model(inputs=input_x, outputs=[c3, c2, c1])
     x = GlobalAveragePooling2D(name="avgpooling")(x)
@@ -88,7 +88,7 @@ def output_to_pred(head, anchors, hyper_params):
     box_ctr = tf.nn.sigmoid(box_ctr_)
     box_ctr = box_ctr + grid_cell
     box_ctr = box_ctr * ratio # rescale to img size
-    box_size = tf.exp(box_size_) * scaled_anchors
+    box_size = tf.exp(tf.tanh(box_size_)) * scaled_anchors
     box_size = box_size * ratio
     box_coor = tf.concat([box_ctr, box_size], axis=-1) # x y w h
 
@@ -109,7 +109,7 @@ class Head(Layer):
         super(Head, self).__init__(**kwargs)
         self.hyper_params = hyper_params
         self.anchors = anchors
-
+    # @tf.function
     def call(self, inputs):
         coor_lst, obj_lst, cls_lst = [], [], []
         for i in range(len(inputs)):
@@ -141,25 +141,49 @@ def yolo_block(inputs, filters):
     return [head, fpn]
 
 #%%
-def yolo_v3(input_shape, hyper_params, anchors):
+def yolo_v3(input_shape, hyper_params):
     base_model = DarkNet53(include_top=False, input_shape=input_shape)
     total_labels = hyper_params["total_labels"]
 
     inputs = base_model.input
 
     head1, p1 = yolo_block(base_model.output[2], 512)
-    head1 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head1)
+    head1 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head1) # 13
     p1 = conv_block(256, 1)(p1)
     p1 = UpSampling2D(2)(p1)
     concat1 = Concatenate()([p1, base_model.output[1]])
     head2, p2 = yolo_block(concat1, 256)
-    head2 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head2)
+    head2 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head2) # 26
     p2 = conv_block(128, 1)(p2)
     p2 = UpSampling2D(2)(p2)
     concat2 = Concatenate()([p2, base_model.output[0]])
     head3, _ = yolo_block(concat2, 128)
-    head3 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head3)
-    head = [head1, head2, head3]
-    outputs = Head(anchors, hyper_params)(head)
+    head3 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head3) # 53
+    head = [head1, head2, head3] # 13 26 52
+    # outputs = Head(anchors, hyper_params)(head)
 
-    return Model(inputs=inputs, outputs=outputs)
+    return Model(inputs=inputs, outputs=head)
+
+#%%
+def yolo_head(feats, anchors, num_classes, input_shape):
+    num_anchors = len(anchors)
+    anchors_tensor = tf.reshape(anchors, [1, 1, 1, num_anchors, 2])
+
+    grid_shape = tf.shape(feats)[1:3]
+
+    grid_y = tf.tile(tf.reshape(tf.range(0, grid_shape[0]), [-1, 1, 1, 1]), [1, grid_shape[1], 1, 1])
+    grid_x = tf.tile(tf.reshape(tf.range(0, grid_shape[1]), [-1, 1, 1, 1]), [1, grid_shape[0], 1, 1])
+
+    grid = tf.concat([grid_y, grid_x], axis=-1)
+    grid = tf.cast(grid, tf.float32)
+
+    feats = tf.reshape(feats, [-1, grid_shape[0], grid_shape[1], num_anchors, num_classes + 5])
+
+    box_yx = (tf.nn.sigmoid(feats[...,:2]) + grid) / tf.cast(grid_shape[...,-1], tf.float32)
+    box_hw = tf.exp(feats[..., 2:4]) * anchors_tensor / tf.cast(input_shape[..., -1], tf.float32)
+
+    box_obj = tf.sigmoid(feats[..., 4:5])
+    box_cls = tf.sigmoid(feats[..., 5:])
+
+    return grid, feats, box_yx, box_hw, box_obj, box_cls
+

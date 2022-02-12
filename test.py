@@ -22,7 +22,7 @@ if dataset_name == "ship":
     dataset = dataset.map(lambda x, y, z, w: preprocessing_utils.preprocessing_ship(x, y, z, w))
 else:
     import data_utils
-    dataset, labels = data_utils.fetch_dataset(dataset_name, "train", img_size, save_dir="/home1/wonhyung64")
+    dataset, labels = data_utils.fetch_dataset(dataset_name, "train", img_size)
     dataset = dataset.map(lambda x, y, z: preprocessing_utils.preprocessing(x, y, z))
 
 data_shapes = ([None, None, None], [None, None], [None])
@@ -39,7 +39,7 @@ anchors3 = box_prior[0:3] # 52, 52
 anchors = [anchors3, anchors2, anchors1]
 
 #%%
-weights_dir = os.getcwd() + "/atmp"
+weights_dir = os.getcwd() + "/yolo_atmp"
 weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]
 
 input_shape = (416, 416, 3)
