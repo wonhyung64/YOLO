@@ -55,12 +55,6 @@ def xywh_to_bbox(boxes):
     x2 = x_ctr + width/2
     boxes = tf.concat([y1, x1, y2, x2], axis=-1)
     return boxes
-# %%
-import data_utils
-img_size = (416,416)
-dataset, labels = data_utils.fetch_dataset('voc07', "train", img_size)
-dataset = iter(dataset)
-sample = next(dataset)
 
 #%%
 def box_iou(b1, b2):

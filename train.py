@@ -24,13 +24,11 @@ else:
     import data_utils
     dataset, labels = data_utils.fetch_dataset(dataset_name, "train", img_size)
     dataset = dataset.map(lambda x, y, z: preprocessing_utils.preprocessing(x, y, z))
-    # dataset = dataset.map(lambda x, y, z: target_utils.calculate_target(x, y, z))
 
-dataset = dataset.shuffle(buffer_size=5050, reshuffle_each_iteration=True)
+# dataset = dataset.shuffle(buffer_size=5050, reshuffle_each_iteration=True)
 data_shapes = ([None, None, None], [None, None], [None])
 padding_values = (tf.constant(0, tf.float32), tf.constant(0, tf.float32), tf.constant(-1, tf.int32))
 dataset = dataset.repeat().padded_batch(batch_size, padded_shapes=data_shapes, padding_values=padding_values, drop_remainder=True)
-# dataset = dataset.repeat().batch(batch_size)
 dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
 dataset = iter(dataset)
 #%%
@@ -42,8 +40,12 @@ anchors3 = box_prior[0:3] # 52, 52
 anchors = [anchors1, anchors2, anchors3]
 
 #%%
+# weights_dir = os.getcwd() + "/yolo_atmp"#
+# weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]#
+
 input_shape = (416, 416, 3)
 yolo_model = model_utils.yolo_v3(input_shape, hyper_params)
+# yolo_model.load_weights(weights_dir + '/yolo_weights/weights')#
 
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=hyper_params["lr"])
@@ -52,16 +54,12 @@ optimizer = tf.keras.optimizers.Adam(learning_rate=hyper_params["lr"])
 def train_step(img, true):
     with tf.GradientTape(persistent=True) as tape:
         yolo_outputs = yolo_model(img)
-        box_loss, conf_loss, cls_loss = loss_utils.yolo_loss(yolo_outputs, true)
-        # box_loss = loss_utils.box_loss_fn(pred, true, anchors, hyper_params)
-        # box_loss = loss_utils.box_loss_fn(pred, true, hyper_params)
-        # conf_loss = loss_utils.conf_loss_fn(pred, true, ignore_mask, hyper_params)
-        # cls_loss = loss_utils.cls_loss_fn(pred, true)
-        total_loss = box_loss + conf_loss + cls_loss
+        yx_loss, hw_loss, conf_loss, cls_loss = loss_utils.yolo_loss(yolo_outputs, true)
+        total_loss = yx_loss + hw_loss + conf_loss + cls_loss
     grads = tape.gradient(total_loss, yolo_model.trainable_weights)
     optimizer.apply_gradients(zip(grads, yolo_model.trainable_weights))
     
-    return box_loss, conf_loss, cls_loss, total_loss
+    return yx_loss, hw_loss, conf_loss, cls_loss, total_loss
 
 # %%
 atmp_dir = os.getcwd()
@@ -75,23 +73,22 @@ start_time = time.time()
 for _ in progress_bar:
     img, gt_boxes, gt_labels = next(dataset)
     true = target_utils.generate_target(gt_boxes, gt_labels)
-    box_loss, conf_loss, cls_loss, total_loss = train_step(img, true)
-    print(box_loss, conf_loss, cls_loss, total_loss)
+    yx_loss, hw_loss, conf_loss, cls_loss, total_loss = train_step(img, true)
 
     step += 1
 
-    progress_bar.set_description('iterations {}/{} | box_loss {:.4f}, conf_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
+    progress_bar.set_description('iterations {}/{} | yx_loss {:.4f}, hw_loss {:.4f}, conf_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
         step, hyper_params['iters'], 
-        box_loss.numpy(), conf_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
+        yx_loss.numpy(), hw_loss.numpy(), conf_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
     )) 
 
     if step % 500 == 0 : 
-        print(progress_bar.set_description('iterations {}/{} | box_loss {:.4f}, conf_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
+        print(progress_bar.set_description('iterations {}/{} | yx_loss {:.4f}, hw_loss {:.4f}, conf_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
             step, hyper_params['iters'], 
-            box_loss.numpy(), conf_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
-        )))
+            yx_loss.numpy(), hw_loss.numpy(), conf_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
+        )) )
     
-    if step % 1000 == 0 : 
+    if step % 2500 == 0 : 
         yolo_model.save_weights(atmp_dir + '/yolo_weights/weights')
         print("Weights Saved")
 
@@ -123,9 +120,9 @@ progress_bar = tqdm(range(hyper_params['attempts']))
 for _ in progress_bar:
     img, gt_boxes, gt_labels = next(dataset)
     start_time = time.time()
-    pred = yolo_model(img)
+    yolo_outputs = yolo_model(img)
 
-    final_bboxes, final_labels, final_scores = postprocessing_utils.Decode(pred, hyper_params)
+    final_bboxes, final_labels, final_scores = postprocessing_utils.Decode(yolo_outputs)
     time_ = float(time.time() - start_time)*1000
     AP = test_utils.calculate_AP(final_bboxes, final_labels, gt_boxes, gt_labels, hyper_params)
     total_time.append(time_)

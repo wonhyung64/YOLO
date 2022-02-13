@@ -7,8 +7,8 @@ def get_hyper_params():
     hyper_params = {
         "img_size" : 416,
         "nms_boxes_per_class" : 50,
-        "score_thresh" : 0.5,
-        "nms_thresh" : 0.5,
+        "score_thresh" : 0.01,
+        "nms_thresh" : 0.7,
         "coord_tune" : .5,
         "noobj_tune" : 5.,
         "batch_size": 2,
@@ -18,7 +18,7 @@ def get_hyper_params():
         "dataset_name" : "voc07",
         "total_labels" : 20,
         "focal" : False,
-        "lr": 1e-5
+        "lr": 1e-4
     }
     return hyper_params
 
