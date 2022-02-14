@@ -40,15 +40,18 @@ anchors3 = box_prior[0:3] # 52, 52
 anchors = [anchors1, anchors2, anchors3]
 
 #%%
-# weights_dir = os.getcwd() + "/yolo_atmp"#
-# weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]#
 
 input_shape = (416, 416, 3)
 yolo_model = model_utils.yolo_v3(input_shape, hyper_params)
+# weights_dir = os.getcwd() + "/yolo_atmp"#
+# weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]#
 # yolo_model.load_weights(weights_dir + '/yolo_weights/weights')#
 
+boundaries = [10000, 11000, 260000, 31000]
+values = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+learning_rate_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
 
-optimizer = tf.keras.optimizers.Adam(learning_rate=hyper_params["lr"])
+optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
 
 @tf.function
 def train_step(img, true):
@@ -65,9 +68,10 @@ def train_step(img, true):
 atmp_dir = os.getcwd()
 atmp_dir = utils.generate_save_dir(atmp_dir, hyper_params)
 
-step = 0
+
+step = tf.Variable(0, trainable=False)
 progress_bar = tqdm(range(hyper_params['iters']))
-progress_bar.set_description('iterations {}/{} | current loss ?'.format(step, hyper_params['iters']))
+progress_bar.set_description('iterations {}/{} | current loss ?'.format(step.numpy(), hyper_params['iters']))
 start_time = time.time()
 
 for _ in progress_bar:
@@ -75,16 +79,16 @@ for _ in progress_bar:
     true = target_utils.generate_target(gt_boxes, gt_labels)
     yx_loss, hw_loss, conf_loss, cls_loss, total_loss = train_step(img, true)
 
-    step += 1
+    step.assign_add(1)
 
     progress_bar.set_description('iterations {}/{} | yx_loss {:.4f}, hw_loss {:.4f}, conf_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
-        step, hyper_params['iters'], 
+        step.numpy(), hyper_params['iters'], 
         yx_loss.numpy(), hw_loss.numpy(), conf_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
     )) 
 
     if step % 500 == 0 : 
         print(progress_bar.set_description('iterations {}/{} | yx_loss {:.4f}, hw_loss {:.4f}, conf_loss {:.4f}, cls_loss {:.4f}, loss {:.4f}'.format(
-            step, hyper_params['iters'], 
+            step.numpy(), hyper_params['iters'], 
             yx_loss.numpy(), hw_loss.numpy(), conf_loss.numpy(), cls_loss.numpy(), total_loss.numpy()
         )) )
     

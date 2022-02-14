@@ -39,7 +39,7 @@ anchors = [anchors1, anchors2, anchors3]
 
 #%%
 weights_dir = os.getcwd() + "/yolo_atmp"
-weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]
+weights_dir = weights_dir + "/" + os.listdir(weights_dir)[1]
 
 input_shape = (416, 416, 3)
 yolo_model = model_utils.yolo_v3(input_shape, hyper_params)
