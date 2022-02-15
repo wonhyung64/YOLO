@@ -45,6 +45,7 @@ input_shape = (416, 416, 3)
 yolo_model = model_utils.yolo_v3(input_shape, hyper_params)
 yolo_model.load_weights(weights_dir + '/yolo_weights/weights')
 
+
 #%%
 # save_dir = os.getcwd()
 # save_dir = utils.generate_save_dir(save_dir, hyper_params)
