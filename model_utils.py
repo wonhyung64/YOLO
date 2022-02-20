@@ -1,4 +1,5 @@
 #%%
+import os
 import tensorflow as tf
 from tensorflow.keras.layers import Layer, Conv2D, GlobalAveragePooling2D, Dense, Add, BatchNormalization, LeakyReLU, Input, UpSampling2D, Concatenate
 from tensorflow.keras.models import Model
@@ -56,7 +57,7 @@ def DarkNet53(include_top=True, input_shape=(None, None, 3)):
     if include_top == False:
         return Model(inputs=input_x, outputs=[c3, c2, c1])
     x = GlobalAveragePooling2D(name="avgpooling")(x)
-    output_x = Dense(1000, activation="softmax", name="fc")(x)
+    output_x = Dense(20, activation="softmax", name="fc")(x)
     return Model(inputs=input_x, outputs=output_x)
 
 #%%
@@ -143,6 +144,11 @@ def yolo_block(inputs, filters):
 #%%
 def yolo_v3(input_shape, hyper_params):
     base_model = DarkNet53(include_top=False, input_shape=input_shape)
+    weights_dir = os.getcwd() + "/darknet"#
+    base_model.load_weights(weights_dir + '/weights')#
+    base_model.trainable=False
+
+    # base_model = Model(inputs=backbone.input, outputs=backbone.get_layer("add_22").output)
     total_labels = hyper_params["total_labels"]
 
     inputs = base_model.input

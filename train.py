@@ -43,15 +43,17 @@ anchors = [anchors1, anchors2, anchors3]
 
 input_shape = (416, 416, 3)
 yolo_model = model_utils.yolo_v3(input_shape, hyper_params)
-# weights_dir = os.getcwd() + "/yolo_atmp"#
-# weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]#
-# yolo_model.load_weights(weights_dir + '/yolo_weights/weights')#
+# yolo_model.summary()
+weights_dir = os.getcwd() + "/yolo_atmp"#
+weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]#
+yolo_model.load_weights(weights_dir + '/yolo_weights/weights')#
 
-boundaries = [10000, 11000, 260000, 31000]
-values = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
-learning_rate_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
+# boundaries = [10000, 11000, 260000, 31000]
+# values = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+# learning_rate_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
 
-optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
+# optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-8)
 
 @tf.function
 def train_step(img, true):
