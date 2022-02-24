@@ -57,7 +57,7 @@ def DarkNet53(include_top=True, input_shape=(None, None, 3)):
     if include_top == False:
         return Model(inputs=input_x, outputs=[c3, c2, c1])
     x = GlobalAveragePooling2D(name="avgpooling")(x)
-    output_x = Dense(20, activation="softmax", name="fc")(x)
+    output_x = Dense(1000, activation="softmax", name="fc")(x)
     return Model(inputs=input_x, outputs=output_x)
 
 #%%

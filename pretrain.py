@@ -1,4 +1,6 @@
 #%%
+# %load_ext tensorboard
+#%%
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,41 +10,33 @@ import tensorflow_datasets as tfds
 
 import model_utils
 
+import datetime
+
+import numpy as np
+
 #%%
+try_num = int(input("input try num"))
 labels_path = tf.keras.utils.get_file("ImageNetLabels.txt", "https://storage.googleapis.com/download.tensorflow.org/data/ImageNetLabels.txt")
 imagenet_labels = np.array(open(labels_path).read().splitlines())
-
-data_dir = "datasets/imagenet/"
-write_dir = "psando/tf-imagenet-dirs"
-
-download_config = tfds.download.DownloadConfig(
-    extract_dir = os.path.join(write_dir, "extracted"),
-    manual_dir=data_dir
-)
-
-download_and_prepare_kwargs = {
-    "download_config" : os.path.join(write_dir, "downloaded"),
-    "download_config" : download_config,
-}
-
-
-ds = tfds.load("imagenet2012",
-               data_dir=os.path.join(write_dir, "data"),
-               split="train",
-               shuffle_files=False,
-               download=True,
-               as_supervised=True,
-               download_and_prepare_kwargs=download_and_prepare_kwargs
-               )
+imagenet_labels = np.delete(imagenet_labels, 0)
             
 ds = tfds.load("imagenet2012",
-               data_dir=os.path.join(write_dir, "data"),
+               data_dir="D:/won/data/tfds",
                split="train",
                shuffle_files=False,
                download=True,
                as_supervised=True,
-               download_and_prepare_kwargs=download_and_prepare_kwargs
                )
+
+ds_val = tfds.load("imagenet2012",
+               data_dir="D:/won/data/tfds",
+               split="validation",
+               shuffle_files=False,
+               download=True,
+               as_supervised=True,
+               )
+
+
 # %%
 def resize_with_crop(image, label):
     i = image
@@ -52,19 +46,42 @@ def resize_with_crop(image, label):
     return(i, label)
 #%%
 ds = ds.map(resize_with_crop)
+ds = ds.batch(32)
+ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
+
+ds_val = ds_val.map(resize_with_crop)
+ds_val = ds_val.batch(32)
+ds_val = ds_val.prefetch(tf.data.experimental.AUTOTUNE)
 
 model = model_utils.DarkNet53(include_top=True, input_shape=(416, 416, 3))
 
-learning_rate = tf.keras.optimizers.schedules.PolynomialDecay(
-    initial_learning_rate=0.1,
-    decay_steps=10000,
-    power=0.4
-)
+boundaries = list(np.array([1, 2, 3, 4, 5, 6, 7]) * 40037)
+values = list(1e-1 - (np.array([0, 1, 2, 3, 4, 5, 6, 7]) + 8*(try_num-1)) * (0.000625))
+learning_rate_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
 
-model.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate),
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+# optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
+# learning_rate = tf.keras.optimizers.schedules.PolynomialDecay(
+#     initial_learning_rate=0.1,
+#     decay_steps=10000,
+#     power=0.4
+# )
+
+model.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate_fn),
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
               metrics=["accuracy"]
               )
 
-model.fit(ds, epochs=160)
+log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
+model.fit(ds, 
+          epochs=8,
+          validation_data=ds_val,
+          callbacks=[tensorboard_callback]
+          )
+
+model.save_weights("C:/Users/USER/Documents/GitHub/YOLO/darknet_weights/weights")
+
+
+# %tensorboard --logdir logs/fit
+# %%
