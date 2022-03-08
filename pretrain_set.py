@@ -37,7 +37,7 @@ def deserialize_example(serialized_string):
     return image, label
 
 #%%
-def fetch_pretrain_set(dataset, split, img_size, data_dir="D:/won", save_dir="D:/won"):
+def fetch_pretrain_set(dataset, split, img_size, data_dir="D:/won", save_dir="/home1/wonhyung64"):
 
     save_dir = save_dir + "/data/crop" + dataset + "_tfrecord_" + str(img_size[0]) + "_" + str(img_size[1])
     if os.path.exists(save_dir) == False:

@@ -18,7 +18,7 @@ hyper_params["batch_size"] = batch_size = 1
 img_size = (hyper_params["img_size"], hyper_params["img_size"])
 dataset_name = hyper_params["dataset_name"]
 
-dataset = pretrain_set.fetch_pretrain_set(dataset_name, "train", (416, 416))
+dataset = pretrain_set.fetch_pretrain_set(dataset_name, "train", (416, 416), save_dir="/home1/wonhyung64")
 
 dataset = dataset.repeat().batch(4)
 dataset = dataset.shuffle(buffer_size=8000, reshuffle_each_iteration=True)
@@ -47,7 +47,7 @@ optimizer = tf.keras.optimizers.Adam(learning_rate=1e-5)
 def train_step(img, true):
     with tf.GradientTape() as tape:
         pred = darknet(img)
-        loss = -tf.math.reduce_sum(true * tf.math.log(pred)) / pred.shape[0]
+        loss = -tf.math.reduce_sum(true * tf.math.log(tf.clip_by_value(pred,1e-9, 1))) / pred.shape[0]
 
     grads = tape.gradient(loss, darknet.trainable_weights)
     optimizer.apply_gradients(zip(grads, darknet.trainable_weights))
@@ -57,7 +57,7 @@ def train_step(img, true):
 
 #%%
 crop_size = (416, 416)
-hyper_params["iters"]=800000
+hyper_params["iters"]=320000
 
 step = tf.Variable(0, trainable=False)
 
@@ -84,7 +84,7 @@ for _ in progress_bar:
         )) )
     
     if step % 10000 == 0 : 
-        darknet.save_weights("C:/Users/USER/Documents/GitHub/YOLO/darknet/weights")
+        darknet.save_weights("/home1/wonhyung64/wd/yolo_atmp/darknet/weights")
         print("Weights Saved")
 
 print("Time taken: %.2fs" % (time.time() - start_time))

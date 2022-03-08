@@ -1,174 +1,139 @@
 #%%
 import os
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, Conv2D, GlobalAveragePooling2D, Dense, Add, BatchNormalization, LeakyReLU, Input, UpSampling2D, Concatenate
+from tensorflow.keras.layers import Conv2D, Input, BatchNormalization, LeakyReLU, ZeroPadding2D, UpSampling2D, Add, Concatenate, GlobalAveragePooling2D, Dense
 from tensorflow.keras.models import Model
 #%%
-class conv_block(Layer):
-    def __init__(self, filters, kernel_size, strides=1, batch_norm=True, **kwargs):
-        super(conv_block, self).__init__(**kwargs)
-        self.filters = filters
-        self.kernel_size = kernel_size
-        self.strides = strides
-        self.batch_norm = batch_norm
+def yolo_v3(input_shape, hyper_params, fine_tunning=True):
+    base_model = DarkNet53(include_top=False, input_shape=input_shape)
+    base_model.load_weights(os.getcwd() + '/darknet_weights/weights')#
+    if fine_tunning == False: base_model.trainable=False
 
-    def build(self, input_shape):
-        super(conv_block, self).build(input_shape)
-        self.cv = Conv2D(self.filters, self.kernel_size, self.strides, padding=("same" if self.strides==1 else "valid"))
-        self.bn = BatchNormalization()
-        self.ac = LeakyReLU(alpha=0.1)
+    total_labels = hyper_params["total_labels"]
 
-    def call(self, inputs):
-        tensor = inputs
-        if self.strides > 1:
-            pad_total = self.kernel_size - 1
-            pad_beg = pad_total // 2
-            pad_end = pad_total - pad_beg
-            tensor = tf.pad(tensor, [[0, 0], [pad_beg, pad_end], [pad_beg, pad_end], [0, 0]])
-        tensor = self.cv(tensor)
-        if self.batch_norm==True:
-            tensor = self.bn(tensor)
-            tensor = self.ac(tensor)
-        return tensor
+    inputs = base_model.input
+    c3, c2, c1 = base_model.output
 
-#%%
-def res_block(inputs, num):
-    for _ in range(num):
-        x = conv_block(inputs.shape[-1]//2, 1)(inputs)
-        x = conv_block(inputs.shape[-1], 3)(x)
-        x = Add()([inputs, x])
-    return x
+    x = conv_block(c1, [{"filter": 512, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 75},
+                        {"filter": 1024, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 76},
+                        {"filter": 512, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 77},
+                        {"filter": 1024, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 78},
+                        {"filter": 512, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 79}
+                        ], skip=False)
+
+    head1 = conv_block(x, [{"filter": 1024, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 80},
+                            {"filter": 3 * (5 + total_labels), "kernel": 1, "stride": 1, "bnorm": False, "leaky": False, "layer_idx": 81}
+                            ], skip=False)
+
+    x = conv_block(x, [{"filter": 256, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 84}], skip=False)
+    x = UpSampling2D(2)(x)
+    x = Concatenate()([x, c2])
+
+    x = conv_block(x, [{"filter": 256, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 87},
+                        {"filter": 512, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 88},
+                        {"filter": 256, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 89},
+                        {"filter": 512, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 90},
+                        {"filter": 256, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 91}
+                        ], skip=False)
+
+    head2 = conv_block(x, [{"filter": 512, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 92},
+                            {"filter": 3 * (5 + total_labels), "kernel": 1, "stride": 1, "bnorm": False, "leaky": False, "layer_idx": 93}
+                            ], skip=False)
+
+    x = conv_block(x, [{"filter": 128, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 96}], skip=False)
+    x = UpSampling2D(2)(x)
+    x = Concatenate()([x, c3])
+
+    x = conv_block(x, [{"filter": 128, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 99},
+                        {"filter": 256, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 100},
+                        {"filter": 128, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 101},
+                        {"filter": 256, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 102},
+                        {"filter": 128, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 103}
+                        ], skip=False)
+
+    head3 = conv_block(x, [{"filter": 256, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 104},
+                            {"filter": 3 * (5 + total_labels), "kernel": 1, "stride": 1, "bnorm": False, "leaky": False, "layer_idx": 105}
+                            ], skip=False)
+    
+    return Model(inputs=inputs, outputs=[head1, head2, head3])
 
 #%%
 def DarkNet53(include_top=True, input_shape=(None, None, 3)):
-
     input_x = Input(shape=input_shape)
-    x = conv_block(32, 3, name="conv1")(input_x)
-    x = conv_block(64, 3, 2, name="conv2")(x)
-    x = res_block(x, 1)
-    x = conv_block(128, 3, 2, name="conv3")(x)
-    x = res_block(x, 2)
-    x = conv_block(256, 3, 2, name="conv4")(x)
-    x = c3 = res_block(x, 8) # 52
-    x = conv_block(512, 3, 2, name="conv5")(x)
-    x = c2 = res_block(x, 8) # 26
-    x = conv_block(1024, 3, 2, name="conv6")(x)
-    x = c1 = res_block(x, 4) # 13
+
+    x = conv_block(input_x, [{"filter": 32, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 0},
+                                  {"filter": 64, "kernel": 3, "stride": 2, "bnorm": True, "leaky": True, "layer_idx": 1},
+                                  {"filter": 32, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 2},
+                                  {"filter": 64, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 3},
+                                  ])
+
+    x = conv_block(x, [{"filter": 128, "kernel": 3, "stride": 2, "bnorm": True, "leaky": True, "layer_idx": 5},
+                        {"filter": 64, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 6},
+                        {"filter": 128, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 7}
+                        ])
+
+    x = conv_block(x, [{"filter": 64, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 9},
+                        {"filter": 128, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 10}
+                        ])
+
+    x = conv_block(x, [{"filter": 256, "kernel": 3, "stride": 2, "bnorm": True, "leaky": True, "layer_idx": 12},
+                        {"filter": 128, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 13},
+                        {"filter": 256, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 14}
+                        ])
+
+    for i in range(7):
+        x = conv_block(x, [{"filter": 128, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 16+i*3},
+                            {"filter": 256, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 17+i*3}
+                            ])
+    c3 = x
+
+    x = conv_block(x, [{"filter": 512, "kernel": 3, "stride": 2, "bnorm": True, "leaky": True, "layer_idx": 37},
+                        {"filter": 256, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 38},
+                        {"filter": 512, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 39}
+                        ])
+
+    for i in range(7):
+        x = conv_block(x, [{"filter": 256, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 41+i*3},
+                            {"filter": 512, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 42+i*3}
+                            ])
+    c2 = x
+
+    x = conv_block(x, [{"filter": 1024, "kernel": 3, "stride": 2, "bnorm": True, "leaky": True, "layer_idx": 62},
+                        {"filter": 512, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 63},
+                        {"filter": 1024, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 64}
+                        ])
+
+    for i in range(3):
+        x = conv_block(x, [{"filter": 512, "kernel": 1, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 66+i*3},
+                            {"filter": 1024, "kernel": 3, "stride": 1, "bnorm": True, "leaky": True, "layer_idx": 67+i*3}
+                            ])
+    c1 = x
+
     if include_top == False:
         return Model(inputs=input_x, outputs=[c3, c2, c1])
     x = GlobalAveragePooling2D(name="avgpooling")(x)
     output_x = Dense(1000, activation="softmax", name="fc")(x)
+
     return Model(inputs=input_x, outputs=output_x)
 
 #%%
-def generate_grid_cell(x_grid_size, y_grid_size):
-    grid_x = tf.range(x_grid_size, dtype=tf.int32)
-    grid_y = tf.range(y_grid_size, dtype=tf.int32)
-    grid_x, grid_y = tf.meshgrid(grid_x, grid_y)
-    flat_grid_x = tf.reshape(grid_x, (-1, 1))
-    flat_grid_y = tf.reshape(grid_y, (-1, 1))
-    flat_grid_cell = tf.concat([flat_grid_x, flat_grid_y], axis=-1)
-    grid_cell = tf.cast(tf.reshape(flat_grid_cell, [x_grid_size, y_grid_size, 1, 2]), tf.float32)
-    return grid_cell
-
-#%%
-def output_to_pred(head, anchors, hyper_params):
-    batch_size = hyper_params["batch_size"]
-    img_size = hyper_params["img_size"]
-    total_labels = hyper_params["total_labels"]
-
-    grid_size = [head.shape[1], head.shape[2]]
-    grid_cell = generate_grid_cell(grid_size[0], grid_size[1])
-
-    ratio = tf.cast(img_size / grid_size[0], tf.float32)
-    scaled_anchors = [(anchor[0]/ratio, anchor[1]/ratio) for anchor in anchors]
-
-    head = tf.reshape(head, [batch_size, grid_size[0], grid_size[1], 3, 5 + total_labels])
-    box_ctr_, box_size_, box_obj_, box_cls_ = tf.split(head, [2, 2, 1, total_labels], axis=-1)
-
-    box_ctr = tf.nn.sigmoid(box_ctr_)
-    box_ctr = box_ctr + grid_cell
-    box_ctr = box_ctr * ratio # rescale to img size
-    box_size = tf.exp(tf.tanh(box_size_)) * scaled_anchors
-    box_size = box_size * ratio
-    box_coor = tf.concat([box_ctr, box_size], axis=-1) # x y w h
-
-    box_obj = tf.nn.sigmoid(box_obj_)
-    box_cls = tf.nn.sigmoid(box_cls_)
-
-    # flatten
-    box_coor = tf.reshape(box_coor, [batch_size, grid_size[0] * grid_size[1], 3, 4]) 
-    box_obj = tf.reshape(box_obj, [batch_size, grid_size[0] * grid_size[1], 3, 1])
-    box_cls = tf.reshape(box_cls, [batch_size, grid_size[0] * grid_size[1], 3, total_labels])
-
-    return box_coor, box_obj, box_cls
-
-
-#%%
-class Head(Layer):
-    def __init__(self, anchors, hyper_params, **kwargs):
-        super(Head, self).__init__(**kwargs)
-        self.hyper_params = hyper_params
-        self.anchors = anchors
-    # @tf.function
-    def call(self, inputs):
-        coor_lst, obj_lst, cls_lst = [], [], []
-        for i in range(len(inputs)):
-            box_coor, box_obj, box_cls = output_to_pred(inputs[i], self.anchors[i], self.hyper_params)
-            coor_lst.append(box_coor)
-            obj_lst.append(box_obj)
-            cls_lst.append(box_cls)
-            
-        boxes = tf.concat(coor_lst, axis=1)
-        boxes = tf.reshape(boxes, [boxes.shape[0], boxes.shape[1] * boxes.shape[2], -1])
-
-        confs = tf.concat(obj_lst, axis=1)
-        confs = tf.reshape(confs, [confs.shape[0], confs.shape[1] * confs.shape[2], -1])
-
-        probs = tf.concat(cls_lst, axis=1)
-        probs = tf.reshape(probs, [probs.shape[0], probs.shape[1] * probs.shape[2], -1])
-
-        pred = tf.concat([boxes, confs, probs], axis=-1)
-        return pred
-
-#%%
-def yolo_block(inputs, filters):
-    x = conv_block(filters*1, 1)(inputs)
-    x = conv_block(filters*2, 3)(x)
-    x = conv_block(filters*1, 1)(x)
-    x = conv_block(filters*2, 3)(x)
-    fpn = conv_block(filters*1, 1)(x)
-    head = conv_block(filters*2, 3)(fpn)
-    return [head, fpn]
-
-#%%
-def yolo_v3(input_shape, hyper_params):
-    base_model = DarkNet53(include_top=False, input_shape=input_shape)
-    weights_dir = os.getcwd() + "/darknet"#
-    base_model.load_weights(weights_dir + '/weights')#
-    base_model.trainable=False
-
-    # base_model = Model(inputs=backbone.input, outputs=backbone.get_layer("add_22").output)
-    total_labels = hyper_params["total_labels"]
-
-    inputs = base_model.input
-
-    head1, p1 = yolo_block(base_model.output[2], 512)
-    head1 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head1) # 13
-    p1 = conv_block(256, 1)(p1)
-    p1 = UpSampling2D(2)(p1)
-    concat1 = Concatenate()([p1, base_model.output[1]])
-    head2, p2 = yolo_block(concat1, 256)
-    head2 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head2) # 26
-    p2 = conv_block(128, 1)(p2)
-    p2 = UpSampling2D(2)(p2)
-    concat2 = Concatenate()([p2, base_model.output[0]])
-    head3, _ = yolo_block(concat2, 128)
-    head3 = Conv2D(3 * (5 + total_labels), 1, 1, bias_initializer=tf.zeros_initializer)(head3) # 53
-    head = [head1, head2, head3] # 13 26 52
-    # outputs = Head(anchors, hyper_params)(head)
-
-    return Model(inputs=inputs, outputs=head)
+def conv_block(inp, convs, skip=True):
+	x = inp
+	count = 0
+	for conv in convs:
+		if count == (len(convs) - 2) and skip:
+			skip_connection = x
+		count += 1
+		if conv['stride'] > 1: x = ZeroPadding2D(((1,0),(1,0)))(x) # peculiar padding as darknet prefer left and top
+		x = Conv2D(conv['filter'],
+				   conv['kernel'],
+				   strides=conv['stride'],
+				   padding='valid' if conv['stride'] > 1 else 'same', # peculiar padding as darknet prefer left and top
+				   name='conv_' + str(conv['layer_idx']),
+				   use_bias=False if conv['bnorm'] else True)(x)
+		if conv['bnorm']: x = BatchNormalization(epsilon=0.001, name='bnorm_' + str(conv['layer_idx']))(x)
+		if conv['leaky']: x = LeakyReLU(alpha=0.1, name='leaky_' + str(conv['layer_idx']))(x)
+	return Add()([skip_connection, x]) if skip else x
 
 #%%
 def yolo_head(feats, anchors, num_classes, input_shape):
@@ -192,4 +157,3 @@ def yolo_head(feats, anchors, num_classes, input_shape):
     box_cls = tf.sigmoid(feats[..., 5:])
 
     return grid, feats, box_yx, box_hw, box_obj, box_cls
-

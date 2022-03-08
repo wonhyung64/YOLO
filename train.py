@@ -18,14 +18,14 @@ dataset_name = hyper_params["dataset_name"]
 #%%
 if dataset_name == "ship":
     import ship
-    dataset, labels = ship.fetch_dataset(dataset_name, "train", img_size)
+    dataset, labels = ship.fetch_dataset(dataset_name, "train", img_size, save_dir="/home1/wonhyung64")
     dataset = dataset.map(lambda x, y, z, w: preprocessing_utils.preprocessing_ship(x, y, z, w))
 else:
     import data_utils
     dataset, labels = data_utils.fetch_dataset(dataset_name, "train", img_size)
     dataset = dataset.map(lambda x, y, z: preprocessing_utils.preprocessing(x, y, z))
 
-# dataset = dataset.shuffle(buffer_size=5050, reshuffle_each_iteration=True)
+dataset = dataset.shuffle(buffer_size=5050, reshuffle_each_iteration=True)
 data_shapes = ([None, None, None], [None, None], [None])
 padding_values = (tf.constant(0, tf.float32), tf.constant(0, tf.float32), tf.constant(-1, tf.int32))
 dataset = dataset.repeat().padded_batch(batch_size, padded_shapes=data_shapes, padding_values=padding_values, drop_remainder=True)
@@ -43,17 +43,19 @@ anchors = [anchors1, anchors2, anchors3]
 
 input_shape = (416, 416, 3)
 yolo_model = model_utils.yolo_v3(input_shape, hyper_params)
-# yolo_model.summary()
-weights_dir = os.getcwd() + "/yolo_atmp"#
-weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]#
-yolo_model.load_weights(weights_dir + '/yolo_weights/weights')#
+# weights_dir = os.getcwd() + "/yolo_atmp"#
+# weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]#
+# yolo_model.load_weights(weights_dir + '/yolo_weights/weights')#
 
-# boundaries = [10000, 11000, 260000, 31000]
-# values = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
-# learning_rate_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
+boundaries = [100000//2, 260000//2, 310000//2]
+values = [1e-5, 1e-6, 1e-7, 1e-8]
 
-# optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
-optimizer = tf.keras.optimizers.Adam(learning_rate=1e-8)
+# boundaries = [250000, 325000]
+# values = [1e-5, 1e-6, 1e-7]
+
+learning_rate_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
+optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
+# optimizer = tf.keras.optimizers.Adam(learning_rate=1e-8)
 
 @tf.function
 def train_step(img, true):
@@ -98,13 +100,14 @@ for _ in progress_bar:
         yolo_model.save_weights(atmp_dir + '/yolo_weights/weights')
         print("Weights Saved")
 
+yolo_model.save_weights(atmp_dir + '/yolo_weights/weights')
 print("Time taken: %.2fs" % (time.time() - start_time))
 utils.save_dict_to_file(hyper_params, atmp_dir + '/hyper_params')
 
 #%%test
 if dataset_name == "ship":
     import ship
-    dataset, labels = ship.fetch_dataset(dataset_name, "train", img_size, save_dir="/home1/wonhyung64")
+    dataset, labels = ship.fetch_dataset(dataset_name, "train", img_size)
     dataset = dataset.map(lambda x, y, z, w: preprocessing_utils.preprocessing_ship(x, y, z, w))
 else:
     import data_utils
@@ -115,7 +118,7 @@ dataset = dataset.repeat().batch(1)
 dataset = iter(dataset)
 
 input_shape = (416, 416, 3)
-yolo_model = model_utils.yolo_v3(input_shape, hyper_params, anchors)
+yolo_model = model_utils.yolo_v3(input_shape, hyper_params)
 yolo_model.load_weights(atmp_dir + '/yolo_weights/weights')
 
 total_time = []
