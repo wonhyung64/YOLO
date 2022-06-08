@@ -156,18 +156,20 @@ def yolo_loss(yolo_outputs, true):
         ignore_mask = ignore_mask.stack()
         ignore_mask = tf.expand_dims(ignore_mask, -1)
 
-        # yx_loss = object_mask * box_loss_scale * bce_fnq(tf.sigmoid(raw_pred[...,:2]), raw_true_yx)
-        # yx_loss = object_mask * box_loss_scale * tf.square(raw_true_yx - tf.sigmoid(raw_pred[...,:2]))
-        yx_loss = object_mask * tf.square(raw_true_yx - tf.sigmoid(raw_pred[...,:2]))
+        # yx_loss = object_mask * box_loss_scale * bce_fn(tf.sigmoid(raw_pred[...,:2]), raw_true_yx)
+        yx_loss = object_mask * box_loss_scale * tf.square(raw_true_yx - tf.sigmoid(raw_pred[...,:2]))
+        # yx_loss = object_mask * tf.square(raw_true_yx - tf.sigmoid(raw_pred[...,:2]))
         yx_loss = tf.reduce_sum(yx_loss) / mf
-        # hw_loss = object_mask * box_loss_scale * 0.5 * tf.square(raw_true_hw - raw_pred[...,2:4])
-        hw_loss = object_mask * 0.5 * tf.square(raw_true_hw - raw_pred[...,2:4])
+        hw_loss = object_mask * box_loss_scale * 0.5 * tf.square(raw_true_hw - raw_pred[...,2:4])
+        # hw_loss = object_mask * box_loss_scale * tf.square(raw_true_hw - raw_pred[...,2:4])
+        hw_loss = object_mask * 5. * tf.square(raw_true_hw - raw_pred[...,2:4])
         hw_loss = tf.reduce_sum(hw_loss) / mf
         total_yx_loss += yx_loss
         total_hw_loss += hw_loss
 
         obj_loss = object_mask * bce_fn(tf.sigmoid(raw_pred[..., 4:5]), object_mask) 
-        noobj_loss = (1 - object_mask) * bce_fn(tf.sigmoid(raw_pred[..., 4:5]), object_mask) * ignore_mask
+        noobj_loss = (1 - object_mask) * bce_fn(tf.sigmoid(raw_pred[..., 4:5]), object_mask) * ignore_mask * 0.5
+        # noobj_loss = (1 - object_mask) * bce_fn(tf.sigmoid(raw_pred[..., 4:5]), object_mask) * ignore_mask
         conf_loss = tf.reduce_sum(obj_loss + noobj_loss) / mf
         total_conf_loss += conf_loss
 

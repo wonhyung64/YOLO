@@ -19,26 +19,26 @@ hyper_params["batch_size"] = batch_size = 1
 img_size = (hyper_params["img_size"], hyper_params["img_size"])
 dataset_name = hyper_params["dataset_name"]
 
-# if dataset_name == "ship":
-#     import ship
-#     dataset, labels = ship.fetch_dataset(dataset_name, "train", img_size, save_dir="/home1/wonhyung64")
-#     dataset = dataset.map(lambda x, y, z, w: preprocessing_utils.preprocessing_ship(x, y, z, w))
-# else:
-#     import data_utils
-#     dataset, labels = data_utils.fetch_dataset(dataset_name, "train", img_size)
-#     dataset = dataset.map(lambda x, y, z: preprocessing_utils.preprocessing(x, y, z))
+if dataset_name == "ship":
+    import ship
+    dataset, labels = ship.fetch_dataset(dataset_name, "train", img_size, save_dir="/home1/wonhyung64")
+    dataset = dataset.map(lambda x, y, z, w: preprocessing_utils.preprocessing_ship(x, y, z, w))
+else:
+    import data_utils
+    dataset, labels = data_utils.fetch_dataset(dataset_name, "test", img_size)
+    dataset = dataset.map(lambda x, y, z: preprocessing_utils.preprocessing(x, y, z))
 
-def preprocessing(sample):
-    image = sample["image"] 
-    image = tf.image.resize(image, (416, 416)) / 255
-    gt_boxes = sample["objects"]["bbox"]
-    gt_labels = tf.cast(sample["objects"]["label"], tf.int32)
-    return image, gt_boxes, gt_labels
+# def preprocessing(sample):
+#     image = sample["image"] 
+#     image = tf.image.resize(image, (416, 416)) / 255
+#     gt_boxes = sample["objects"]["bbox"]
+#     gt_labels = tf.cast(sample["objects"]["label"], tf.int32)
+#     return image, gt_boxes, gt_labels
 
-dataset, dataset_info = tfds.load(name="coco/2017", data_dir="D:/won/data/tfds", with_info=True)
-dataset = dataset["validation"]
-labels = dataset_info.features["objects"]["label"].names
-dataset = dataset.map(lambda x : preprocessing(x))
+# dataset, dataset_info = tfds.load(name="coco/2017", data_dir="D:/won/data/tfds", with_info=True)
+# dataset = dataset["validation"]
+# labels = dataset_info.features["objects"]["label"].names
+# dataset = dataset.map(lambda x : preprocessing(x))
 
 dataset = dataset.repeat().batch(batch_size)
 dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
@@ -57,11 +57,11 @@ anchors = [anchors1, anchors2, anchors3]
 
 
 weights_dir = os.getcwd() + "/yolo_atmp"
-weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-1]
+weights_dir = weights_dir + "/" + os.listdir(weights_dir)[-3]
 # weights_dir = os.getcwd() + "/redmon_weights/weights"
 input_shape = (416, 416, 3)
 yolo_model = model_utils.yolo_v3(input_shape, hyper_params)
-yolo_model.load_weights(weights_dir)
+yolo_model.load_weights(weights_dir + "/yolo_weights/weights")
 
 #%%
 # save_dir = os.getcwd()
@@ -219,13 +219,3 @@ box_prior2
 box_prior2[:,0] * box_prior2[:,1]
 box_prior3
 box_prior3[:,0] * box_prior3[:,1]
-
-
-#%%
-#%%
-# %%
-
-
-
-
-#%%

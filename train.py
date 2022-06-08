@@ -2,6 +2,7 @@
 import os
 import time
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
 
 from tqdm import tqdm
@@ -25,7 +26,7 @@ else:
     dataset, labels = data_utils.fetch_dataset(dataset_name, "train", img_size)
     dataset = dataset.map(lambda x, y, z: preprocessing_utils.preprocessing(x, y, z))
 
-dataset = dataset.shuffle(buffer_size=5050, reshuffle_each_iteration=True)
+dataset = dataset.shuffle(buffer_size=5012, seed=1234, reshuffle_each_iteration=True)
 data_shapes = ([None, None, None], [None, None], [None])
 padding_values = (tf.constant(0, tf.float32), tf.constant(0, tf.float32), tf.constant(-1, tf.int32))
 dataset = dataset.repeat().padded_batch(batch_size, padded_shapes=data_shapes, padding_values=padding_values, drop_remainder=True)
@@ -49,13 +50,17 @@ yolo_model = model_utils.yolo_v3(input_shape, hyper_params)
 
 boundaries = [100000//2, 260000//2, 310000//2]
 values = [1e-5, 1e-6, 1e-7, 1e-8]
+# boundaries = [75180, 112770]
+# values = [1e-3, 1e-4, 1e-5]
+# values = [1e-5, 1e-6, 1e-7]
 
 # boundaries = [250000, 325000]
 # values = [1e-5, 1e-6, 1e-7]
 
 learning_rate_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
+# optimizer = tfa.optimizers.SGDW(weight_decay=0.0005, learning_rate=learning_rate_fn, momentum=0.9)
+# optimizer = tfa.optimizers.AdamW(weight_decay=0.0005, learning_rate=learning_rate_fn)
 optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
-# optimizer = tf.keras.optimizers.Adam(learning_rate=1e-8)
 
 @tf.function
 def train_step(img, true):
