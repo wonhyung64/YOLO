@@ -3,7 +3,8 @@ import tensorflow as tf
 from typing import Tuple
 import tensorflow_datasets as tfds
 
-def prefetch_dataset(datasets, data_num, batch_size):
+
+def prefetch_dataset(datasets, data_num, batch_size, img_size):
     train_set, valid_set, test_set = datasets
     data_shapes = ([None, None, None], [None, None], [None])
     padding_values = (
@@ -15,7 +16,9 @@ def prefetch_dataset(datasets, data_num, batch_size):
     tf.random.set_seed(42)
     train_set = train_set.map(lambda x: preprocess(x, split="train", img_size=img_size))
     test_set = test_set.map(lambda x: preprocess(x, split="test", img_size=img_size))
-    valid_set = valid_set.map(lambda x: preprocess(x, split="validation", img_size=img_size))
+    valid_set = valid_set.map(
+        lambda x: preprocess(x, split="validation", img_size=img_size)
+    )
 
     train_set = train_set.shuffle(buffer_size=data_num, seed=42)
 
@@ -51,10 +54,7 @@ def prefetch_dataset(datasets, data_num, batch_size):
 
 def load_dataset(name, data_dir):
     train1, dataset_info = tfds.load(
-        name=name,
-        split="train",
-        data_dir=data_dir,
-        with_info=True
+        name=name, split="train", data_dir=data_dir, with_info=True
     )
     train2 = tfds.load(
         name=name,
@@ -82,8 +82,10 @@ def load_dataset(name, data_dir):
             break
         data_num += 1
 
-    try: labels = dataset_info.features["labels"].names
-    except: labels = dataset_info.features["objects"]["label"].names
+    try:
+        labels = dataset_info.features["labels"].names
+    except:
+        labels = dataset_info.features["objects"]["label"].names
 
     return (train_set, valid_set, test_set), labels, data_num
 
@@ -92,17 +94,23 @@ def export_data(sample):
     image = sample["image"]
     gt_boxes = sample["objects"]["bbox"]
     gt_labels = sample["objects"]["label"]
-    try: is_diff = sample["objects"]["is_crowd"]
-    except: is_diff = sample["objects"]["is_difficult"]
+    try:
+        is_diff = sample["objects"]["is_crowd"]
+    except:
+        is_diff = sample["objects"]["is_difficult"]
 
     return image, gt_boxes, gt_labels, is_diff
 
 
 def resize_and_rescale(image, img_size):
-    transform = tf.keras.Sequential([
-        tf.keras.layers.experimental.preprocessing.Resizing(img_size[0], img_size[1]),
-        tf.keras.layers.experimental.preprocessing.Rescaling(1./255.)
-    ])
+    transform = tf.keras.Sequential(
+        [
+            tf.keras.layers.experimental.preprocessing.Resizing(
+                img_size[0], img_size[1]
+            ),
+            tf.keras.layers.experimental.preprocessing.Rescaling(1.0 / 255.0),
+        ]
+    )
     image = transform(image)
 
     return image
@@ -137,7 +145,7 @@ def preprocess(dataset, split, img_size):
     image = resize_and_rescale(image, img_size)
     if split == "train":
         image, gt_boxes = rand_flip_horiz(image, gt_boxes)
-    else: 
+    else:
         gt_boxes, gt_labels = evaluate(gt_boxes, gt_labels, is_diff)
 
     return image, gt_boxes, gt_labels
