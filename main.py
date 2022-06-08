@@ -15,5 +15,3 @@ train_set, valid_set, test_set = prefetch_dataset(datasets, data_num, batch_size
 next(train_set)
 next(valid_set)
 next(test_set)
-
-# %%
