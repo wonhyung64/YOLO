@@ -4,7 +4,7 @@ from typing import Tuple
 import tensorflow_datasets as tfds
 
 
-def prefetch_dataset(datasets, data_num, batch_size, img_size):
+def build_dataset(datasets, data_num, batch_size, img_size):
     train_set, valid_set, test_set = datasets
     data_shapes = ([None, None, None], [None, None], [None])
     padding_values = (
@@ -20,7 +20,7 @@ def prefetch_dataset(datasets, data_num, batch_size, img_size):
         lambda x: preprocess(x, split="validation", img_size=img_size)
     )
 
-    train_set = train_set.shuffle(buffer_size=data_num, seed=42)
+    # train_set = train_set.shuffle(buffer_size=data_num, seed=42)
 
     train_set = train_set.repeat().padded_batch(
         batch_size,
