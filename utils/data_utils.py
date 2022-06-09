@@ -13,13 +13,13 @@ def build_dataset(datasets, data_num, batch_size, img_size):
         tf.constant(-1, tf.int64),
     )
 
-    tf.random.set_seed(42)
     train_set = train_set.map(lambda x: preprocess(x, split="train", img_size=img_size))
     test_set = test_set.map(lambda x: preprocess(x, split="test", img_size=img_size))
     valid_set = valid_set.map(
         lambda x: preprocess(x, split="validation", img_size=img_size)
     )
 
+    # tf.random.set_seed(42)
     # train_set = train_set.shuffle(buffer_size=data_num, seed=42)
 
     train_set = train_set.repeat().padded_batch(

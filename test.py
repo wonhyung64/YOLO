@@ -149,26 +149,6 @@ plt.figure(figsize=(10, 10))
 plt.imshow(image)
 plt.show()
 #%%
-gt_boxes[0]
-hw = []
-
-for sample in tqdm(range(5011)):
-    _, gt_boxes, _ = next(dataset)
-    for bbox in gt_boxes[0]:
-        y1, x1, y2, x2 = tf.split(bbox, 4, axis=-1)
-        hw.append(tf.concat([(y2 - y1) * 416, (x2 - x1) * 416], axis=0))
-
-hw = np.array(hw)
-#%%
-'''box prior'''
-from sklearn.cluster import KMeans
-import pandas as pd
-
-k = 3
-model = KMeans(n_clusters = k, random_state = 1)
-model.fit(hw_2)
-box_prior2 = model.cluster_centers_
-pd.DataFrame(box_prior, columns=['height', 'width']).to_csv('C:/Users/USER/Documents/GitHub/YOLO/box_prior.csv')
 #%%
 #%%
 box_prior = tf.cast([
