@@ -1,10 +1,70 @@
 #%%
+import os
 import tensorflow as tf
 from typing import Tuple
 import tensorflow_datasets as tfds
+from tensorflow.keras.layers import Lambda
 
 
-def build_dataset(datasets, data_num, batch_size, img_size):
+def load_dataset(name, data_dir):
+    train1, dataset_info = tfds.load(
+        name=name, split="train", data_dir=data_dir, with_info=True
+    )
+    train2 = tfds.load(
+        name=name,
+        split="validation[100:]",
+        data_dir=data_dir,
+    )
+    valid_set = tfds.load(
+        name=name,
+        split="validation[:100]",
+        data_dir=data_dir,
+    )
+    test_set = tfds.load(
+        name=name,
+        split="train[:10%]",
+        data_dir=data_dir,
+    )
+    train_set = train1.concatenate(train2)
+
+    data_num = data_num_loader(name, train_set)
+
+    try:
+        labels = dataset_info.features["labels"].names
+    except:
+        labels = dataset_info.features["objects"]["label"].names
+
+    return (train_set, valid_set, test_set), labels, data_num
+
+
+def data_num_loader(name, dataset):
+    data_num_dir = f"./data_chkr/{''.join(char for char in name if char.isalnum())}_num.txt"
+
+    if not(os.path.exists(data_num_dir)):
+        data_num = data_num_chkr(dataset)
+        with open(data_num_dir, "w") as f:
+            f.write(str(data_num))
+            f.close()
+    else: 
+        with open(data_num_dir, "r") as f:
+            data_num = int(f.readline())
+    return data_num
+
+
+def data_num_chkr(dataset):
+    num_chkr = iter(dataset)
+    data_num = 0
+    while True:
+        try:
+            next(num_chkr)
+        except:
+            break
+        data_num += 1
+
+    return data_num
+
+
+def build_dataset(datasets, batch_size, img_size):
     train_set, valid_set, test_set = datasets
     data_shapes = ([None, None, None], [None, None], [None])
     padding_values = (
@@ -18,9 +78,6 @@ def build_dataset(datasets, data_num, batch_size, img_size):
     valid_set = valid_set.map(
         lambda x: preprocess(x, split="validation", img_size=img_size)
     )
-
-    # tf.random.set_seed(42)
-    # train_set = train_set.shuffle(buffer_size=data_num, seed=42)
 
     train_set = train_set.repeat().padded_batch(
         batch_size,
@@ -52,52 +109,15 @@ def build_dataset(datasets, data_num, batch_size, img_size):
     return train_set, valid_set, test_set
 
 
-def load_dataset(name, data_dir):
-    train1, dataset_info = tfds.load(
-        name=name, split="train", data_dir=data_dir, with_info=True
-    )
-    train2 = tfds.load(
-        name=name,
-        split="validation[100:]",
-        data_dir=data_dir,
-    )
-    valid_set = tfds.load(
-        name=name,
-        split="validation[:100]",
-        data_dir=data_dir,
-    )
-    test_set = tfds.load(
-        name=name,
-        split="train[:10%]",
-        data_dir=data_dir,
-    )
-    train_set = train1.concatenate(train2)
-
-    data_ck = iter(train_set)
-    data_num = 0
-    while True:
-        try:
-            next(data_ck)
-        except:
-            break
-        data_num += 1
-
-    try:
-        labels = dataset_info.features["labels"].names
-    except:
-        labels = dataset_info.features["objects"]["label"].names
-
-    return (train_set, valid_set, test_set), labels, data_num
-
 
 def export_data(sample):
-    image = sample["image"]
-    gt_boxes = sample["objects"]["bbox"]
-    gt_labels = sample["objects"]["label"]
+    image = Lambda(lambda x: x["image"])(sample)
+    gt_boxes = Lambda(lambda x: x["objects"]["bbox"])(sample)
+    gt_labels = Lambda(lambda x: x["objects"]["label"])(sample)
     try:
-        is_diff = sample["objects"]["is_crowd"]
+        is_diff = Lambda(lambda x: x["objects"]["is_crowd"])(sample)
     except:
-        is_diff = sample["objects"]["is_difficult"]
+        is_diff = Lambda(lambda x: x["objects"]["is_difficult"])(sample)
 
     return image, gt_boxes, gt_labels, is_diff
 
@@ -118,8 +138,8 @@ def resize_and_rescale(image, img_size):
 
 def evaluate(gt_boxes, gt_labels, is_diff):
     not_diff = tf.logical_not(is_diff)
-    gt_boxes = gt_boxes[not_diff]
-    gt_labels = gt_labels[not_diff]
+    gt_boxes = Lambda(lambda x: x[not_diff])(gt_boxes)
+    gt_labels = Lambda(lambda x: x[not_diff])(gt_labels)
 
     return gt_boxes, gt_labels
 
@@ -129,10 +149,10 @@ def rand_flip_horiz(image: tf.Tensor, gt_boxes: tf.Tensor) -> Tuple:
         image = tf.image.flip_left_right(image)
         gt_boxes = tf.stack(
             [
-                gt_boxes[..., 0],
-                1.0 - gt_boxes[..., 3],
-                gt_boxes[..., 2],
-                1.0 - gt_boxes[..., 1],
+                Lambda(lambda x: x[..., 0])(gt_boxes),
+                Lambda(lambda x: 1.0 - x[..., 3])(gt_boxes),
+                Lambda(lambda x: x[..., 2])(gt_boxes),
+                Lambda(lambda x: 1.0 - x[..., 1])(gt_boxes),
             ],
             -1,
         )
@@ -149,3 +169,4 @@ def preprocess(dataset, split, img_size):
         gt_boxes, gt_labels = evaluate(gt_boxes, gt_labels, is_diff)
 
     return image, gt_boxes, gt_labels
+
