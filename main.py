@@ -16,7 +16,7 @@ import tensorflow_datasets as tfds
 
 
 def load_box_prior(dataset, img_size, data_num, k_per_grid=3):
-    box_prior_dir = f".data_chkr/{''.join(char for char in name if char.isalnum())}_box_prior.csv"
+    box_prior_dir = f"./data_chkr/{''.join(char for char in name if char.isalnum())}_box_prior.csv"
     if not(os.path.exists(box_prior_dir)):
         box_prior = build_box_prior(dataset, img_size, data_num, k_per_grid)
         box_prior.to_csv(box_prior_dir, index=False, header=False)
