@@ -1,8 +1,8 @@
 #%%
 import os
 import tensorflow as tf
-from typing import Tuple
 import tensorflow_datasets as tfds
+from typing import Tuple
 from tensorflow.keras.layers import Lambda
 
 
@@ -38,14 +38,16 @@ def load_dataset(name, data_dir):
 
 
 def load_data_num(name, dataset):
-    data_num_dir = f"./data_chkr/{''.join(char for char in name if char.isalnum())}_num.txt"
+    data_num_dir = (
+        f"./data_chkr/{''.join(char for char in name if char.isalnum())}_num.txt"
+    )
 
-    if not(os.path.exists(data_num_dir)):
+    if not (os.path.exists(data_num_dir)):
         data_num = build_data_num(dataset)
         with open(data_num_dir, "w") as f:
             f.write(str(data_num))
             f.close()
-    else: 
+    else:
         with open(data_num_dir, "r") as f:
             data_num = int(f.readline())
     return data_num
@@ -110,7 +112,6 @@ def build_dataset(datasets, batch_size, img_size):
     return train_set, valid_set, test_set
 
 
-
 def export_data(sample):
     image = Lambda(lambda x: x["image"])(sample)
     gt_boxes = Lambda(lambda x: x["objects"]["bbox"])(sample)
@@ -170,4 +171,3 @@ def preprocess(dataset, split, img_size):
         gt_boxes, gt_labels = evaluate(gt_boxes, gt_labels, is_diff)
 
     return image, gt_boxes, gt_labels
-
