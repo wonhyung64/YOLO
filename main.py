@@ -19,7 +19,3 @@ if __name__ == "__main__":
     train_set, valid_set, test_set = build_dataset(datasets, batch_size, img_size)
     box_prior = load_box_prior(train_set, name, img_size, data_num)
 
-#%%
-
-
-# %%
