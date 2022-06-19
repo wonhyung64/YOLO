@@ -15,7 +15,8 @@ def load_box_prior(dataset, name, img_size, data_num, k_per_grid=3):
         box_prior = build_box_prior(dataset, img_size, data_num, k_per_grid)
         box_prior.to_csv(box_prior_dir, index=False, header=False)
     else:
-        box_prior = pd.read_csv(box_prior_dir).to_numpy()
+        box_prior = pd.read_csv(box_prior_dir, header=None).to_numpy()
+        box_prior = tf.cast(box_prior, dtype=tf.float32)
 
     return box_prior
 
