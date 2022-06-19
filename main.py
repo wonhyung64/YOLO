@@ -26,72 +26,112 @@ if __name__ == "__main__":
 import numpy as np
 import tensorflow as tf
 
-    gt_labels = tf.expand_dims(gt_labels, axis=-1)
-    gt_labels = tf.cast(gt_labels, tf.float32)
-    true_boxes = tf.concat([gt_boxes, gt_labels], axis=-1)
+gt_labels = tf.expand_dims(gt_labels, axis=-1)
+gt_labels = tf.cast(gt_labels, tf.float32)
+true_boxes = tf.concat([gt_boxes, gt_labels], axis=-1)
 
-    anchors = box_prior
+anchors = box_prior
 
-    input_shape = img_size
-    input_shape = np.array(input_shape)
-    m = 4
-    total_labels = len(labels)
+input_shape = img_size
+input_shape = np.array(input_shape)
+m = batch_size
+total_labels = len(labels)
 
-    num_layers = len(anchors) // 3
+num_layers = len(anchors) // 3
 
-    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] 
+anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] 
 
-    true_boxes = np.array(true_boxes, dtype="float32")
-    boxes_yx = (true_boxes[..., 0:2] + true_boxes[..., 2:4]) / 2
-    boxes_hw = true_boxes[..., 2:4] - true_boxes[..., 0:2]
-    true_boxes[..., 0:2] = boxes_yx
-    true_boxes[..., 2:4] = boxes_hw
+true_boxes = np.array(true_boxes, dtype="float32")
+boxes_yx = (true_boxes[..., 0:2] + true_boxes[..., 2:4]) / 2
+boxes_hw = true_boxes[..., 2:4] - true_boxes[..., 0:2]
+true_boxes[..., 0:2] = boxes_yx
+true_boxes[..., 2:4] = boxes_hw
 
-    boxes_yx, boxes_hw = boxes_yx * input_shape, boxes_hw * input_shape
+boxes_yx, boxes_hw = boxes_yx * input_shape, boxes_hw * input_shape
 
-    grid_shapes = [input_shape // {0:32, 1:16, 2:8}[l] for l in range(num_layers)]
+grid_shapes = [input_shape // {0:32, 1:16, 2:8}[l] for l in range(num_layers)]
 
-    y_true = [np.zeros((m, grid_shapes[l][0], grid_shapes[l][1], len(anchor_mask[l]), 5+total_labels), dtype="float32") for l in  range(num_layers)]
+y_true = [np.zeros((m, grid_shapes[l][0], grid_shapes[l][1], len(anchor_mask[l]), 5+total_labels), dtype="float32") for l in  range(num_layers)]
 
-    anchors = np.expand_dims(anchors, 0)
+anchors = np.expand_dims(anchors, 0)
 
-    anchor_maxes = anchors / 2.
-    anchor_mins = -anchor_maxes
-    valid_mask = boxes_hw[..., 0] > 0
+anchor_maxes = anchors / 2.
+anchor_mins = -anchor_maxes
+valid_mask = boxes_hw[..., 0] > 0
 
-    for b in range(m):
-        hw = boxes_hw[b, valid_mask[b]]
-        if len(hw) == 0: continue
+for b in range(m):
+    hw = boxes_hw[b, valid_mask[b]]
+    if len(hw) == 0: continue
 
-        hw = np.expand_dims(hw, -2)
-        box_maxes = hw / 2.
-        box_mins = -box_maxes
+    hw = np.expand_dims(hw, -2)
+    box_maxes = hw / 2.
+    box_mins = -box_maxes
 
-        intersect_mins = np.maximum(box_mins, anchor_mins)
-        intersect_maxes = np.minimum(box_maxes, anchor_maxes)
-        intersect_hw = np.maximum(intersect_maxes - intersect_mins, 0.)
-        intersect_area = intersect_hw[..., 0] * intersect_hw[..., 1]
-        box_area = hw[..., 0] * hw[..., 1]
-        anchor_area = anchors[..., 0] * anchors[..., 1]
-        iou = intersect_area / (box_area + anchor_area - intersect_area)
+    intersect_mins = np.maximum(box_mins, anchor_mins)
+    intersect_maxes = np.minimum(box_maxes, anchor_maxes)
+    intersect_hw = np.maximum(intersect_maxes - intersect_mins, 0.)
+    intersect_area = intersect_hw[..., 0] * intersect_hw[..., 1]
+    box_area = hw[..., 0] * hw[..., 1]
+    anchor_area = anchors[..., 0] * anchors[..., 1]
+    iou = intersect_area / (box_area + anchor_area - intersect_area)
 
-        best_anchor = np.argmax(iou, axis=-1)
+    best_anchor = np.argmax(iou, axis=-1)
 
-        for t, n in enumerate(best_anchor):
-            for l in range(num_layers):
-                if n in anchor_mask[l]:
-                    y = np.floor(true_boxes[b,t,0] * grid_shapes[l][0]).astype("int32")
-                    x = np.floor(true_boxes[b,t,1] * grid_shapes[l][1]).astype("int32") 
-                    k = anchor_mask[l].index(n)
-                    c = true_boxes[b, t, 4].astype("int32")
-                
-                    y_true[l][b, y, x, k, 0:4] = true_boxes[b, t, 0:4]
-                    y_true[l][b, y, x, k, 4] = 1.
-                    y_true[l][b, y, x, k, 5+c] = 1.
+    for t, n in enumerate(best_anchor):
+        for l in range(num_layers):
+            if n in anchor_mask[l]:
+                y = np.floor(true_boxes[b,t,0] * grid_shapes[l][0]).astype("int32")
+                x = np.floor(true_boxes[b,t,1] * grid_shapes[l][1]).astype("int32") 
+                k = anchor_mask[l].index(n)
+                c = true_boxes[b, t, 4].astype("int32")
+            
+                y_true[l][b, y, x, k, 0:4] = true_boxes[b, t, 0:4]
+                y_true[l][b, y, x, k, 4] = 1.
+                y_true[l][b, y, x, k, 5+c] = 1.
 
-    return y_true
+# return y_true
 
 
 
 
 # %%
+    box_prior = tf.cast(box_prior, dtype=tf.float32)
+# def build_anchors(hyper_params: Dict) -> tf.Tensor:
+    """
+    generate reference anchors on grid
+
+    Args:
+        hyper_params (Dict): hyper parameters
+
+    Returns:
+        tf.Tensor: anchors
+    """
+    anchors_lst = []
+    strides = (32, 16, 8)
+    for num, stride in enumerate(strides):
+        feature_map_shape = img_size / stride
+
+        grid_size = 1 / feature_map_shape
+        grid_coords_ctr = tf.cast(
+            tf.range(0, feature_map_shape) / feature_map_shape + grid_size / 2,
+            dtype=tf.float32,
+        )
+        grid_x_ctr, grid_y_ctr = tf.meshgrid(grid_coords_ctr, grid_coords_ctr)
+        flat_grid_x_ctr = tf.reshape(grid_x_ctr, (-1,))
+        flat_grid_y_ctr = tf.reshape(grid_y_ctr, (-1,))
+        tmp_ = (flat_grid_x_ctr*52 - 0.5) / 52
+        grid_map = tf.stack(
+            [flat_grid_y_ctr, flat_grid_x_ctr, flat_grid_y_ctr, flat_grid_x_ctr], axis=-1
+        )
+
+        h, w = tf.split(box_prior[0:3] / 416, 2, axis=-1)
+        base_anchors = tf.concat([-h/2, -w/2, h/2, w/2], axis=-1)
+        anchors = tf.reshape(base_anchors, (1, -1, 4)) + tf.reshape(grid_map, (-1, 1, 4))
+        # anchors = tf.clip_by_value(anchors, clip_value_min=0., clip_value_max=1.)
+        anchors_lst.append(anchors)
+    tf.concat(anchors_lst[0], axis=0)
+    x = (anchors[...,3] + anchors[..., 1]) / 2
+    x[...,0]*52 - tmp_ * 52
+    (x - tf.stack([tmp_, tmp_, tmp_], axis=-1)) * 52
+
+    return anchors
