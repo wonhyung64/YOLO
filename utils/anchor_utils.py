@@ -85,3 +85,76 @@ def extract_boxes(gt_boxes, img_size):
     prior_sample = Lambda(lambda x: x[not_zero])(prior_sample)
 
     return prior_sample
+
+
+def build_anchor_ops(img_size, box_priors):
+    anchors_lst = []
+    anchor_grids_lst = []
+    anchor_shapes_lst = []
+
+    strides = (32, 16, 8)
+    for num, stride in enumerate(strides):
+        feature_map_shape = img_size[0] / stride
+        grid_y_ctr, grid_x_ctr = build_grid(feature_map_shape)
+        flat_grid_x_ctr = tf.reshape(grid_x_ctr, (-1,))
+        flat_grid_y_ctr = tf.reshape(grid_y_ctr, (-1,))
+        anchor_grid = build_anchor_grid(
+            flat_grid_y_ctr,
+            flat_grid_x_ctr,
+            feature_map_shape
+            )
+        anchor_shape = tf.shape(anchor_grid)
+        box_prior = box_priors[6-3*num:9-3*num] / img_size[0]
+        anchor = build_anchor(flat_grid_y_ctr, flat_grid_x_ctr, box_prior)
+
+        anchors_lst.append(anchor)
+        anchor_grids_lst.append(anchor_grid)
+        anchor_shapes_lst.append(anchor_shape)
+
+    anchors = tf.concat(anchors_lst, axis=0)
+    anchor_grids = tf.concat(anchor_grids_lst, axis=0)
+    anchor_shapes = tf.stack(anchor_shapes_lst, axis=0)
+
+    return anchors, anchor_grids, anchor_shapes
+
+
+def build_grid(feature_map_shape):
+    grid_size = 1 / feature_map_shape
+    grid_coords_ctr = tf.cast(
+        tf.range(0, feature_map_shape) / feature_map_shape + grid_size / 2,
+        dtype=tf.float32,
+    )
+    grid_y_ctr, grid_x_ctr = tf.meshgrid(grid_coords_ctr, grid_coords_ctr)
+
+    return grid_y_ctr, grid_x_ctr
+
+
+def build_anchor_grid(flat_grid_y_ctr, flat_grid_x_ctr, feature_map_shape):
+    anchor_grid_y = tf.tile(
+        tf.expand_dims(flat_grid_y_ctr - 0.5 / feature_map_shape, axis=-1),
+        multiples=[1,3]
+        )
+    anchor_grid_x = tf.tile(
+        tf.expand_dims(flat_grid_x_ctr - 0.5 / feature_map_shape, axis=-1),
+        multiples=[1,3]
+        )
+    anchor_grids = tf.stack(
+        [
+        tf.reshape(anchor_grid_y, (-1)),
+        tf.reshape(anchor_grid_x, (-1)),
+        ]
+        , axis=-1)
+
+    return anchor_grids
+
+
+def build_anchor(flat_grid_y_ctr, flat_grid_x_ctr, box_prior):
+    grid_map = tf.stack(
+        [flat_grid_y_ctr, flat_grid_x_ctr, flat_grid_y_ctr, flat_grid_x_ctr], axis=-1
+    )
+    h, w = tf.split(box_prior, 2, axis=-1)
+    base_anchors = tf.concat([-h/2, -w/2, h/2, w/2], axis=-1)
+    anchors = tf.reshape(base_anchors, (1, -1, 4)) + tf.reshape(grid_map, (-1, 1, 4))
+    anchors = tf.reshape(anchors, (-1, 4))
+
+    return anchors

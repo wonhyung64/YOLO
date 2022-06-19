@@ -4,6 +4,7 @@ from utils import (
     load_dataset,
     build_dataset,
     load_box_prior,
+    build_anchor_ops,
 )
 
 
@@ -17,7 +18,8 @@ if __name__ == "__main__":
 
     datasets, labels, data_num = load_dataset(name=name, data_dir=data_dir)
     train_set, valid_set, test_set = build_dataset(datasets, batch_size, img_size)
-    box_prior = load_box_prior(train_set, name, img_size, data_num)
+    box_priors = load_box_prior(train_set, name, img_size, data_num)
+    anchors, anchor_grids, anchor_shapes = build_anchor_ops(img_size, box_priors)
     
     image, gt_boxes, gt_labels = next(train_set)
 
@@ -91,47 +93,3 @@ for b in range(m):
 
 # return y_true
 
-
-
-
-# %%
-    box_prior = tf.cast(box_prior, dtype=tf.float32)
-# def build_anchors(hyper_params: Dict) -> tf.Tensor:
-    """
-    generate reference anchors on grid
-
-    Args:
-        hyper_params (Dict): hyper parameters
-
-    Returns:
-        tf.Tensor: anchors
-    """
-    anchors_lst = []
-    strides = (32, 16, 8)
-    for num, stride in enumerate(strides):
-        feature_map_shape = img_size / stride
-
-        grid_size = 1 / feature_map_shape
-        grid_coords_ctr = tf.cast(
-            tf.range(0, feature_map_shape) / feature_map_shape + grid_size / 2,
-            dtype=tf.float32,
-        )
-        grid_x_ctr, grid_y_ctr = tf.meshgrid(grid_coords_ctr, grid_coords_ctr)
-        flat_grid_x_ctr = tf.reshape(grid_x_ctr, (-1,))
-        flat_grid_y_ctr = tf.reshape(grid_y_ctr, (-1,))
-        tmp_ = (flat_grid_x_ctr*52 - 0.5) / 52
-        grid_map = tf.stack(
-            [flat_grid_y_ctr, flat_grid_x_ctr, flat_grid_y_ctr, flat_grid_x_ctr], axis=-1
-        )
-
-        h, w = tf.split(box_prior[0:3] / 416, 2, axis=-1)
-        base_anchors = tf.concat([-h/2, -w/2, h/2, w/2], axis=-1)
-        anchors = tf.reshape(base_anchors, (1, -1, 4)) + tf.reshape(grid_map, (-1, 1, 4))
-        # anchors = tf.clip_by_value(anchors, clip_value_min=0., clip_value_max=1.)
-        anchors_lst.append(anchors)
-    tf.concat(anchors_lst[0], axis=0)
-    x = (anchors[...,3] + anchors[..., 1]) / 2
-    x[...,0]*52 - tmp_ * 52
-    (x - tf.stack([tmp_, tmp_, tmp_], axis=-1)) * 52
-
-    return anchors

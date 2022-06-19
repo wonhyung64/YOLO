@@ -14,4 +14,8 @@ from .anchor_utils import (
     k_means,
     collect_boxes,
     extract_boxes,
+    build_anchor_ops,
+    build_grid,
+    build_anchor_grid,
+    build_anchor,
 )
