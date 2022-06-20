@@ -73,7 +73,7 @@ def build_dataset(datasets, batch_size, img_size):
     padding_values = (
         tf.constant(0, tf.float32),
         tf.constant(0, tf.float32),
-        tf.constant(-1, tf.int64),
+        tf.constant(-1, tf.int32),
     )
 
     train_set = train_set.map(lambda x: preprocess(x, split="train", img_size=img_size))
@@ -169,5 +169,6 @@ def preprocess(dataset, split, img_size):
         image, gt_boxes = rand_flip_horiz(image, gt_boxes)
     else:
         gt_boxes, gt_labels = evaluate(gt_boxes, gt_labels, is_diff)
+    gt_labels = tf.cast(gt_labels, dtype=tf.int32)
 
     return image, gt_boxes, gt_labels
