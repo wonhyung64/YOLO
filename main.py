@@ -7,6 +7,79 @@ from utils import (
     build_anchor_ops,
 )
 
+from tqdm import tqdm
+import tensorflow as tf
+def build_pos_target(anchors, gt_boxes, gt_labels, labels):
+    iou_map = generate_iou(anchors, gt_boxes)
+    max_indices_each_column = tf.argmax(iou_map, axis=1, output_type=tf.int32)
+    valid_indices_cond = tf.not_equal(gt_labels, -1)
+    valid_indices = tf.cast(tf.where(valid_indices_cond), tf.int32)
+    valid_gt_boxes = gt_boxes[valid_indices_cond]
+    valid_gt_labels = gt_labels[valid_indices_cond] + 1
+    valid_max_indices = max_indices_each_column[valid_indices_cond]
+    scatter_bbox_indices = tf.stack([valid_indices[..., 0], valid_max_indices], 1)
+
+    pos_mask = tf.scatter_nd(
+        indices=scatter_bbox_indices,
+        updates=tf.fill(tf.shape(valid_indices)[0], True),
+        shape=tf.shape(iou_map)[:2],
+    )
+
+    pos_obj = tf.where(
+        pos_mask,
+        tf.ones_like(pos_mask, dtype=tf.float32),
+        tf.zeros_like(pos_mask, dtype=tf.float32),
+    )
+    pos_obj = tf.expand_dims(pos_obj, axis=-1)
+
+    pos_reg = tf.scatter_nd(
+        indices=scatter_bbox_indices,
+        updates=valid_gt_boxes,
+        shape=tf.concat([tf.shape(iou_map)[:2], tf.constant([4], tf.int32)], axis=0),
+    )
+
+    pos_cls = tf.scatter_nd(
+        indices=scatter_bbox_indices,
+        updates=valid_gt_labels,
+        shape=tf.shape(iou_map)[:2],
+    ) - 1
+    pos_cls = tf.one_hot(pos_cls, len(labels), dtype=tf.float32)
+
+    return pos_obj, pos_reg, pos_cls
+
+
+def generate_iou(anchors: tf.Tensor, gt_boxes: tf.Tensor) -> tf.Tensor:
+    """
+    calculate Intersection over Union
+
+    Args:
+        anchors (tf.Tensor): reference anchors
+        gt_boxes (tf.Tensor): bbox to calculate IoU
+
+    Returns:
+        tf.Tensor: Intersection over Union
+    """
+    bbox_y1, bbox_x1, bbox_y2, bbox_x2 = tf.split(anchors, 4, axis=-1)
+    gt_y1, gt_x1, gt_y2, gt_x2 = tf.split(gt_boxes, 4, axis=-1)
+
+    bbox_area = tf.squeeze((bbox_y2 - bbox_y1) * (bbox_x2 - bbox_x1), axis=-1)
+    gt_area = tf.squeeze((gt_y2 - gt_y1) * (gt_x2 - gt_x1), axis=-1)
+
+    x_top = tf.maximum(bbox_x1, tf.transpose(gt_x1, [0, 2, 1]))
+    y_top = tf.maximum(bbox_y1, tf.transpose(gt_y1, [0, 2, 1]))
+    x_bottom = tf.minimum(bbox_x2, tf.transpose(gt_x2, [0, 2, 1]))
+    y_bottom = tf.minimum(bbox_y2, tf.transpose(gt_y2, [0, 2, 1]))
+
+    intersection_area = tf.maximum(x_bottom - x_top, 0) * tf.maximum(
+        y_bottom - y_top, 0
+    )
+
+    union_area = (
+        tf.expand_dims(bbox_area, -1) + tf.expand_dims(gt_area, 1) - intersection_area
+    )
+
+    return intersection_area / union_area
+
 
 #%%
 if __name__ == "__main__":
@@ -21,75 +94,8 @@ if __name__ == "__main__":
     box_priors = load_box_prior(train_set, name, img_size, data_num)
     anchors, anchor_grids, anchor_shapes = build_anchor_ops(img_size, box_priors)
     
-    image, gt_boxes, gt_labels = next(train_set)
 
-
-#%%
-import numpy as np
-import tensorflow as tf
-
-gt_labels = tf.expand_dims(gt_labels, axis=-1)
-gt_labels = tf.cast(gt_labels, tf.float32)
-true_boxes = tf.concat([gt_boxes, gt_labels], axis=-1)
-
-anchors = box_prior
-
-input_shape = img_size
-input_shape = np.array(input_shape)
-m = batch_size
-total_labels = len(labels)
-
-num_layers = len(anchors) // 3
-
-anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] 
-
-true_boxes = np.array(true_boxes, dtype="float32")
-boxes_yx = (true_boxes[..., 0:2] + true_boxes[..., 2:4]) / 2
-boxes_hw = true_boxes[..., 2:4] - true_boxes[..., 0:2]
-true_boxes[..., 0:2] = boxes_yx
-true_boxes[..., 2:4] = boxes_hw
-
-boxes_yx, boxes_hw = boxes_yx * input_shape, boxes_hw * input_shape
-
-grid_shapes = [input_shape // {0:32, 1:16, 2:8}[l] for l in range(num_layers)]
-
-y_true = [np.zeros((m, grid_shapes[l][0], grid_shapes[l][1], len(anchor_mask[l]), 5+total_labels), dtype="float32") for l in  range(num_layers)]
-
-anchors = np.expand_dims(anchors, 0)
-
-anchor_maxes = anchors / 2.
-anchor_mins = -anchor_maxes
-valid_mask = boxes_hw[..., 0] > 0
-
-for b in range(m):
-    hw = boxes_hw[b, valid_mask[b]]
-    if len(hw) == 0: continue
-
-    hw = np.expand_dims(hw, -2)
-    box_maxes = hw / 2.
-    box_mins = -box_maxes
-
-    intersect_mins = np.maximum(box_mins, anchor_mins)
-    intersect_maxes = np.minimum(box_maxes, anchor_maxes)
-    intersect_hw = np.maximum(intersect_maxes - intersect_mins, 0.)
-    intersect_area = intersect_hw[..., 0] * intersect_hw[..., 1]
-    box_area = hw[..., 0] * hw[..., 1]
-    anchor_area = anchors[..., 0] * anchors[..., 1]
-    iou = intersect_area / (box_area + anchor_area - intersect_area)
-
-    best_anchor = np.argmax(iou, axis=-1)
-
-    for t, n in enumerate(best_anchor):
-        for l in range(num_layers):
-            if n in anchor_mask[l]:
-                y = np.floor(true_boxes[b,t,0] * grid_shapes[l][0]).astype("int32")
-                x = np.floor(true_boxes[b,t,1] * grid_shapes[l][1]).astype("int32") 
-                k = anchor_mask[l].index(n)
-                c = true_boxes[b, t, 4].astype("int32")
-            
-                y_true[l][b, y, x, k, 0:4] = true_boxes[b, t, 0:4]
-                y_true[l][b, y, x, k, 4] = 1.
-                y_true[l][b, y, x, k, 5+c] = 1.
-
-# return y_true
-
+    for _ in tqdm(range(data_num)):
+        image, gt_boxes, gt_labels = next(train_set)
+        pos_obj, pos_reg, pos_cls = build_pos_target(anchors, gt_boxes, gt_labels, labels)
+        
