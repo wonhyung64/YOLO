@@ -22,7 +22,6 @@ if __name__ == "__main__":
     box_priors = load_box_prior(train_set, name, img_size, data_num)
     anchors, prior_grids, offset_grids, stride_grids = build_anchor_ops(img_size, box_priors)
     model = yolo_v3((416,416,3), labels, offset_grids, prior_grids, fine_tunning=True)
-    model.summary()
 
     for _ in tqdm(range(data_num)):
         image, gt_boxes, gt_labels = next(train_set)
