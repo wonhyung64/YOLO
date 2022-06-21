@@ -1,15 +1,29 @@
 #%%
 import os
 import tensorflow as tf
-from tensorflow.keras.layers import Conv2D, Input, BatchNormalization, LeakyReLU, ZeroPadding2D, UpSampling2D, Add, Concatenate, GlobalAveragePooling2D, Dense
+from tensorflow.keras.layers import (
+    Conv2D,
+    Input,
+    BatchNormalization,
+    LeakyReLU,
+    ZeroPadding2D,
+    UpSampling2D,
+    GlobalAveragePooling2D,
+    Dense,
+    Concatenate,
+    Reshape,
+    Add,
+    Multiply,
+    Activation,
+)
 from tensorflow.keras.models import Model
 #%%
-def yolo_v3(input_shape, hyper_params, fine_tunning=True):
+def yolo_v3(input_shape, labels, offset_grids, prior_grids, fine_tunning=True):
     base_model = DarkNet53(include_top=False, input_shape=input_shape)
     base_model.load_weights(os.getcwd() + '/darknet_weights/weights')#
     if fine_tunning == False: base_model.trainable=False
 
-    total_labels = hyper_params["total_labels"]
+    total_labels = len(labels)
 
     inputs = base_model.input
     c3, c2, c1 = base_model.output
@@ -55,9 +69,11 @@ def yolo_v3(input_shape, hyper_params, fine_tunning=True):
                             {"filter": 3 * (5 + total_labels), "kernel": 1, "stride": 1, "bnorm": False, "leaky": False, "layer_idx": 105}
                             ], skip=False)
     
-    return Model(inputs=inputs, outputs=[head1, head2, head3])
+    outputs = yolo_head([head1, head2, head3], offset_grids, prior_grids)
+    
+    return Model(inputs=inputs, outputs=outputs)
 
-#%%
+
 def DarkNet53(include_top=True, input_shape=(None, None, 3)):
     input_x = Input(shape=input_shape)
 
@@ -116,7 +132,7 @@ def DarkNet53(include_top=True, input_shape=(None, None, 3)):
 
     return Model(inputs=input_x, outputs=output_x)
 
-#%%
+
 def conv_block(inp, convs, skip=True):
 	x = inp
 	count = 0
@@ -135,25 +151,22 @@ def conv_block(inp, convs, skip=True):
 		if conv['leaky']: x = LeakyReLU(alpha=0.1, name='leaky_' + str(conv['layer_idx']))(x)
 	return Add()([skip_connection, x]) if skip else x
 
-#%%
-def yolo_head(feats, anchors, num_classes, input_shape):
-    num_anchors = len(anchors)
-    anchors_tensor = tf.reshape(anchors, [1, 1, 1, num_anchors, 2])
 
-    grid_shape = tf.shape(feats)[1:3]
+def yolo_head(inputs, offset_grids, prior_grids):
+    head1, head2, head3 = inputs
+    x = Concatenate(axis=1)(
+        [
+            Reshape(target_shape=(13*13*3, -1))(head1),
+            Reshape(target_shape=(26*26*3, -1))(head2),
+            Reshape(target_shape=(52*52*3, -1))(head3),
+        ]
+    )
+    outputs = Concatenate(axis=-1)(
+        [
+            Add()([tf.nn.sigmoid(x[...,:2]), tf.broadcast_to(offset_grids, tf.shape(x[...,:2]))]),
+            Multiply()([tf.exp(x[...,2:4]), tf.broadcast_to(prior_grids, tf.shape(x[...,2:4]))]),
+            Activation("sigmoid")(x[...,4:]),
+        ]
+    )
 
-    grid_y = tf.tile(tf.reshape(tf.range(0, grid_shape[0]), [-1, 1, 1, 1]), [1, grid_shape[1], 1, 1])
-    grid_x = tf.tile(tf.reshape(tf.range(0, grid_shape[1]), [1, -1, 1, 1]), [grid_shape[0], 1, 1, 1])
-
-    grid = tf.concat([grid_y, grid_x], axis=-1)
-    grid = tf.cast(grid, tf.float32)
-
-    feats = tf.reshape(feats, [-1, grid_shape[0], grid_shape[1], num_anchors, num_classes + 5])
-
-    box_yx = (tf.nn.sigmoid(feats[...,:2]) + grid) / tf.cast(grid_shape[...,-1], tf.float32)
-    box_hw = tf.exp(feats[..., 2:4]) * anchors_tensor / tf.cast(input_shape[..., -1], tf.float32)
-
-    box_obj = tf.sigmoid(feats[..., 4:5])
-    box_cls = tf.sigmoid(feats[..., 5:])
-
-    return grid, feats, box_yx, box_hw, box_obj, box_cls
+    return outputs
