@@ -29,6 +29,3 @@ if __name__ == "__main__":
         outputs = model(image)
         pos_reg, pos_obj, pos_cls = build_pos_target(anchors, gt_boxes, gt_labels, labels)
         break
-
-
-# %%
