@@ -89,33 +89,38 @@ def extract_boxes(gt_boxes, img_size):
 
 def build_anchor_ops(img_size, box_priors):
     anchors_lst = []
-    anchor_grids_lst = []
-    anchor_shapes_lst = []
+    prior_grids_lst = []
+    offset_grids_lst = []
+    stride_grids_lst = []
 
     strides = (32, 16, 8)
     for num, stride in enumerate(strides):
-        feature_map_shape = img_size[0] / stride
+        feature_map_shape = img_size[0] // stride
         grid_y_ctr, grid_x_ctr = build_grid(feature_map_shape)
         flat_grid_x_ctr = tf.reshape(grid_x_ctr, (-1,))
         flat_grid_y_ctr = tf.reshape(grid_y_ctr, (-1,))
-        anchor_grid = build_anchor_grid(
+        box_prior = box_priors[6-3*num:9-3*num] 
+
+        anchor = build_anchor(flat_grid_y_ctr, flat_grid_x_ctr, box_prior / img_size[0])
+        prior_grid = tf.tile(box_prior, (feature_map_shape * feature_map_shape, 1))
+        offset_grid = build_offset(
             flat_grid_y_ctr,
             flat_grid_x_ctr,
             feature_map_shape
             )
-        anchor_shape = tf.shape(anchor_grid)
-        box_prior = box_priors[6-3*num:9-3*num] / img_size[0]
-        anchor = build_anchor(flat_grid_y_ctr, flat_grid_x_ctr, box_prior)
+        stride_grid = tf.constant(stride, dtype=tf.float32, shape=tf.shape(offset_grid))
 
         anchors_lst.append(anchor)
-        anchor_grids_lst.append(anchor_grid)
-        anchor_shapes_lst.append(anchor_shape)
+        prior_grids_lst.append(prior_grid)
+        offset_grids_lst.append(offset_grid)
+        stride_grids_lst.append(stride_grid)
 
     anchors = tf.concat(anchors_lst, axis=0)
-    anchor_grids = tf.concat(anchor_grids_lst, axis=0)
-    anchor_shapes = tf.stack(anchor_shapes_lst, axis=0)
+    prior_grids = tf.concat(prior_grids_lst, axis=0)
+    offset_grids = tf.concat(offset_grids_lst, axis=0)
+    stride_grids = tf.concat(stride_grids_lst, axis=0)
 
-    return anchors, anchor_grids, anchor_shapes
+    return anchors, prior_grids, offset_grids, stride_grids
 
 
 def build_grid(feature_map_shape):
@@ -129,23 +134,23 @@ def build_grid(feature_map_shape):
     return grid_y_ctr, grid_x_ctr
 
 
-def build_anchor_grid(flat_grid_y_ctr, flat_grid_x_ctr, feature_map_shape):
-    anchor_grid_y = tf.tile(
-        tf.expand_dims(flat_grid_y_ctr - 0.5 / feature_map_shape, axis=-1),
+def build_offset(flat_grid_y_ctr, flat_grid_x_ctr, feature_map_shape):
+    offset_y = tf.tile(
+        tf.expand_dims(flat_grid_y_ctr * feature_map_shape - 0.5, axis=-1),
         multiples=[1,3]
         )
-    anchor_grid_x = tf.tile(
-        tf.expand_dims(flat_grid_x_ctr - 0.5 / feature_map_shape, axis=-1),
+    offset_x = tf.tile(
+        tf.expand_dims(flat_grid_x_ctr * feature_map_shape - 0.5, axis=-1),
         multiples=[1,3]
         )
-    anchor_grids = tf.stack(
+    offset = tf.stack(
         [
-        tf.reshape(anchor_grid_y, (-1)),
-        tf.reshape(anchor_grid_x, (-1)),
+        tf.reshape(offset_y, (-1)),
+        tf.reshape(offset_x, (-1)),
         ]
         , axis=-1)
 
-    return anchor_grids
+    return offset
 
 
 def build_anchor(flat_grid_y_ctr, flat_grid_x_ctr, box_prior):
