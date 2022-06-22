@@ -32,3 +32,27 @@ def calculate_iou(anchors: tf.Tensor, gt_boxes: tf.Tensor) -> tf.Tensor:
     )
 
     return intersection_area / union_area
+
+
+def delta_to_bbox(delta_yx, delta_hw, stride_grids):
+    delta_yx = delta_yx * tf.broadcast_to(stride_grids, tf.shape(delta_yx))
+    bbox_y1x1 = delta_yx - (0.5 * delta_hw)
+    bbox_y2x2 = delta_yx + (0.5 * delta_hw)
+    bbox = tf.concat([bbox_y1x1, bbox_y2x2], axis=-1)
+
+    return bbox
+
+
+def bbox_to_delta(bbox, img_size, stride_grids):
+    bbox = bbox * img_size[0]
+    y1, x1, y2, x2 = tf.split(bbox, 4, axis=-1)
+
+    delta_y = (y1 + y2) / 2 
+    delta_x = (x1 + x2) / 2 
+    delta_h = y2 - y1
+    delta_w = x2 - x1
+
+    delta_yx = tf.concat([delta_y, delta_x], axis=-1) / stride_grids
+    delta_hw = tf.concat([delta_h, delta_w], axis=-1)
+
+    return delta_yx, delta_hw

@@ -161,12 +161,11 @@ def yolo_head(inputs, offset_grids, prior_grids):
             Reshape(target_shape=(52*52*3, -1))(head3),
         ]
     )
-    outputs = Concatenate(axis=-1)(
-        [
-            Add()([tf.nn.sigmoid(x[...,:2]), tf.broadcast_to(offset_grids, tf.shape(x[...,:2]))]),
-            Multiply()([tf.exp(x[...,2:4]), tf.broadcast_to(prior_grids, tf.shape(x[...,2:4]))]),
-            Activation("sigmoid")(x[...,4:]),
-        ]
-    )
+    outputs = [
+        Add()([tf.nn.sigmoid(x[..., :2]), tf.broadcast_to(offset_grids, tf.shape(x[...,:2]))]),
+        Multiply()([tf.exp(x[..., 2:4]), tf.broadcast_to(prior_grids, tf.shape(x[...,2:4]))]),
+        Activation("sigmoid")(x[..., 4:5]),
+        Activation("sigmoid")(x[..., 5:]),
+    ]
 
     return outputs

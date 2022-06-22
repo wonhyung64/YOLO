@@ -6,9 +6,11 @@ from utils import (
     build_dataset,
     load_box_prior,
     build_anchor_ops,
-    build_pos_target,
+    build_target,
     yolo_v3,
+    loss_fn,
 )
+
 #%%
 if __name__ == "__main__":
     os.makedirs("data_chkr", exist_ok=True)
@@ -25,6 +27,18 @@ if __name__ == "__main__":
 
     for _ in tqdm(range(data_num)):
         image, gt_boxes, gt_labels = next(train_set)
-        outputs = model(image)
-        pos_reg, pos_obj, pos_cls = build_pos_target(anchors, gt_boxes, gt_labels, labels)
-        break
+        pred_yx, pred_hw, pred_obj, pred_cls = model(image)
+        true_yx, true_hw, true_obj, true_nobj, true_cls = build_target(anchors, gt_boxes, gt_labels, labels, img_size, stride_grids)
+        yx_loss, hw_loss, obj_loss, nobj_loss, cls_loss = loss_fn(
+            pred=[pred_yx, pred_hw, pred_obj, pred_cls],
+            true=[true_yx, true_hw, true_obj, true_nobj, true_cls],
+            batch_size=batch_size
+        )
+        print(yx_loss)
+        print(hw_loss)
+        print(obj_loss)
+        print(nobj_loss)
+        print(cls_loss)
+        
+        if _ == 100: break 
+# %%
