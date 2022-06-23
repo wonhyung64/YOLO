@@ -5,13 +5,13 @@ from .loss_utils import loss_fn
 
 def build_optimizer(batch_size, data_num):
     boundaries = [data_num // batch_size * epoch for epoch in (10, 60, 90)]
-    values = [1e-3, 1e-4, 1e-5, 1e-6]
-    # values = [1e-4, 1e-5, 1e-6, 1e-7]
+    # values = [1e-3, 1e-4, 1e-5, 1e-6]
+    values = [1e-4, 1e-5, 1e-6, 1e-7]
     lr_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
         boundaries, values
     )
-    optimizer = tfa.optimizers.SGDW(learning_rate=lr_fn, weight_decay=tf.constant(0.0005), momentum=tf.constant(0.9))
-    # optimizer = tfa.optimizers.AdamW(learning_rate=lr_fn, weight_decay=tf.constant(0.0005))
+    # optimizer = tfa.optimizers.SGDW(learning_rate=lr_fn, weight_decay=tf.constant(0.0005), momentum=tf.constant(0.9))
+    optimizer = tfa.optimizers.AdamW(learning_rate=lr_fn, weight_decay=tf.constant(0.0005))
 
     return optimizer
 

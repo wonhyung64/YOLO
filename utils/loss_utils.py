@@ -19,13 +19,7 @@ def loss_fn(pred, true, batch_size, lambda_lst):
     pred_yx, pred_hw, pred_obj, pred_cls = pred
     true_yx, true_hw, true_obj, true_nobj, true_cls = true
     batch_size = tf.constant(batch_size, dtype=tf.float32)
-
     lambda_yx, lambda_hw, lambda_obj, lambda_nobj, lambda_cls = lambda_lst
-    lambda_yx = tf.constant(lambda_yx, dtype=tf.float32)
-    lambda_hw = tf.constant(lambda_hw, dtype=tf.float32)
-    lambda_obj = tf.constant(lambda_obj, dtype=tf.float32)
-    lambda_nobj = tf.constant(lambda_nobj, dtype=tf.float32)
-    lambda_cls = tf.constant(lambda_cls, dtype=tf.float32)
 
     yx_loss = tf.reduce_sum(tf.square(pred_yx - true_yx) * true_obj) / batch_size * lambda_yx
     hw_loss = tf.reduce_sum(tf.square(pred_hw - true_hw) * true_obj) / batch_size * lambda_hw
