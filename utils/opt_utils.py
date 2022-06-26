@@ -26,4 +26,4 @@ def forward_backward(image, true, model, optimizer, batch_size, lambda_lst):
     grads = tape.gradient(total_loss, model.trainable_weights)
     optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-    return loss
+    return loss, total_loss
