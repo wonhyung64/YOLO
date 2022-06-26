@@ -17,3 +17,4 @@ __pycache__/
 /darknet_weights
 /yolov3_org_weights
 data_chkr
+utils/variable.py
