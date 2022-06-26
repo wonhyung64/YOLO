@@ -1,5 +1,6 @@
 #%%
 import os
+import argparse
 import tensorflow as tf
 from tqdm import tqdm
 from utils import (
@@ -11,11 +12,44 @@ from utils import (
     yolo_v3,
     build_optimizer,
     forward_backward,
+    build_args,
 )
 
+try: import neptune.new as neptune
+except:
+    import sys
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "neptune-client"])
+    import neptune.new as neptune
+
+from utils.variable import (
+    NEPTUNE_API_KEY,
+    NEPTUNE_PROJECT,
+)
+
+def plugin_neptune(NEPTUNE_API_KEY, NEPTUNE_PROJECT, hyper_params):
+    os.environ["NEPTUNE_API_TOKEN"] = NEPTUNE_API_KEY
+
+    run = neptune.init(project=NEPTUNE_PROJECT, 
+                        api_token=NEPTUNE_PROJECT,
+                    mode="offline")
+
+    return run
+    
 #%%
 if __name__ == "__main__":
     os.makedirs("data_chkr", exist_ok=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--epochs", type = str)
+    parser.add_argument("--dataset-name", type = str)
+    
+    args = parser.parse_args()
+    print(args.base_model)
+    print(args.dataset_name)
+
+
+    hyper_params_dict = get_hyper_params()
+
     epochs = 160
     img_size = [416, 416]
     data_dir = "D:/won/data/tfds"
@@ -56,6 +90,3 @@ if __name__ == "__main__":
                 )
             )
         
-        if _ == 100: break 
-# %%
-print([i for i in range(1, 11)])
