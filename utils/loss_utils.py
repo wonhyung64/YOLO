@@ -28,3 +28,16 @@ def loss_fn(pred, true, batch_size, lambda_lst):
     cls_loss = tf.reduce_sum(bce_fn(pred_cls, true_cls) * true_obj) / batch_size * lambda_cls
 
     return yx_loss, hw_loss, obj_loss, nobj_loss, cls_loss
+
+def build_lambda(args):
+    lambda_dict = {
+        "lambda_yx": args.lambda_yx,
+        "lambda_hw": args.lambda_hw,
+        "lambda_obj": args.lambda_obj,
+        "lambda_nobj": args.lambda_nobj,
+        "lambda_cls": args.lambda_cls,
+        }
+
+    lambda_lst = [tf.constant(lambda_value, dtype=tf.float32) for lambda_value in lambda_dict.values()]
+
+    return lambda_lst
