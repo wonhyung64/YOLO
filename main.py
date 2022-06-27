@@ -18,7 +18,30 @@ from utils import (
     NEPTUNE_API_KEY,
     NEPTUNE_PROJECT,
 )
-    
+
+def decode_pred(
+    pred,
+    batch_size=1,
+    max_total_size=200,
+    iou_threshold=0.5,
+    score_threshold=0.7,
+):
+    pred_yx, pred_hw, pred_obj, pred_cls = pred
+    pred_bboxes = delta_to_bbox(pred_yx, pred_hw, stride_grids)
+
+    pred_bboxes = tf.reshape(pred_bboxes, (batch_size, -1, 1, 4))
+    pred_labels = pred_cls * pred_obj
+
+    final_bboxes, final_scores, final_labels, _ = tf.image.combined_non_max_suppression(
+        pred_bboxes,
+        pred_labels,
+        max_output_size_per_class=max_total_size,
+        max_total_size=max_total_size,
+        iou_threshold=iou_threshold,
+        score_threshold=score_threshold,
+    )
+
+    return final_bboxes, final_labels, final_scores
 #%%
 if __name__ == "__main__":
     # os.makedirs("data_chkr", exist_ok=True)
@@ -63,43 +86,7 @@ if __name__ == "__main__":
     image, gt_boxes, gt_labels =next(train_set)
     pred_yx, pred_hw, pred_obj, pred_cls = model(image)
     pred[3]
-import tensorflow as tf
 
-def Decode(
-    pred_yx,
-    dtn_cls_output,
-    roi_bboxes,
-    hyper_params,
-    max_total_size=200,
-    score_threshold=0.7,
-    iou_threshold=0.5,
-):
-    image, gt_boxes, gt_labels =next(train_set)
-    pred_yx, pred_hw, pred_obj, pred_cls = model(image)
-    pred_yx = tf.stack([pred_yx[...,1], pred_yx[...,0]], axis=-1)
-
-    batch_size = 1
-    total_labels = len(labels)
-
-    pred_bboxes = delta_to_bbox(pred_yx, pred_hw, stride_grids)
-    pred_bboxes = tf.clip_by_value(pred_bboxes, 0, 416) / 416
-
-
-    pred_bboxes = tf.reshape(pred_bboxes, (batch_size, -1, 1, 4))
-
-    pred_labels = pred_cls * pred_obj
-
-    final_bboxes, final_scores, final_labels, _ = tf.image.combined_non_max_suppression(
-        pred_bboxes,
-        pred_labels,
-        max_output_size_per_class=200,
-        max_total_size=200,
-        iou_threshold=0.5,
-        score_threshold=0.7,
-    )
-    draw_dtn_output(image, final_bboxes, labels, final_labels, final_scores)
-
-    return final_bboxes, final_labels, final_scores
 
 
 
