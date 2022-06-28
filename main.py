@@ -42,6 +42,44 @@ def decode_pred(
     )
 
     return final_bboxes, final_labels, final_scores
+
+def draw_output(
+    image,
+    final_bboxes,
+    final_labels,
+    final_scores,
+    labels,
+):
+    image = tf.squeeze(image, axis=0)
+    image = tf.keras.preprocessing.image.array_to_img(image)
+    width, height = image.size
+    draw = ImageDraw.Draw(image)
+
+    y1 = final_bboxes[0][..., 0] * height
+    x1 = final_bboxes[0][..., 1] * width
+    y2 = final_bboxes[0][..., 2] * height
+    x2 = final_bboxes[0][..., 3] * width
+
+    denormalized_box = tf.round(tf.stack([y1, x1, y2, x2], axis=-1))
+
+    colors = tf.random.uniform((len(labels), 4), maxval=256, dtype=tf.int32)
+
+    for index, bbox in enumerate(denormalized_box):
+        y1, x1, y2, x2 = tf.split(bbox, 4, axis=-1)
+        width = x2 - x1
+        height = y2 - y1
+
+        final_labels_ = tf.reshape(final_labels[0], shape=(200,))
+        final_scores_ = tf.reshape(final_scores[0], shape=(200,))
+        label_index = int(final_labels_[index])
+        color = tuple(colors[label_index].numpy())
+        label_text = "{0} {1:0.3f}".format(labels[label_index], final_scores_[index])
+        draw.text((x1 + 4, y1 + 2), label_text, fill=color)
+        draw.rectangle((x1, y1, x2, y2), outline=color, width=3)
+
+    return image
+
+
 #%%
 if __name__ == "__main__":
     # os.makedirs("data_chkr", exist_ok=True)
@@ -81,53 +119,16 @@ if __name__ == "__main__":
     box_priors = load_box_prior(train_set, "coco/2017", [416,416], data_num)
     anchors, prior_grids, offset_grids, stride_grids = build_anchor_ops([416,416], box_priors)
     model = yolo_v3([416,416]+[3], labels, offset_grids, prior_grids, fine_tunning=True)
-    model.load_weights("C:/Users/USER/Documents/GitHub/YOLO/yolov3_org_weights/weights")
+    # model.load_weights("C:/Users/USER/Documents/GitHub/YOLO/yolov3_org_weights/weights")
+    model.save("tmp.h5")
+    # model.load("tmp.h5")
+    model = tf.keras.models.load_model("tmp.h5")
     
-    image, gt_boxes, gt_labels =next(train_set)
-    pred_yx, pred_hw, pred_obj, pred_cls = model(image)
-    pred[3]
-
-
-
-
+import tensorflow as tf
 from PIL import ImageDraw
 
-def draw_dtn_output(
-    image,
-    final_bboxes,
-    labels,
-    final_labels,
-    final_scores,
-):
-    image = tf.squeeze(image, axis=0)
-    image = tf.keras.preprocessing.image.array_to_img(image)
-    width, height = image.size
-    draw = ImageDraw.Draw(image)
-
-    y1 = final_bboxes[0][..., 0] * height
-    x1 = final_bboxes[0][..., 1] * width
-    y2 = final_bboxes[0][..., 2] * height
-    x2 = final_bboxes[0][..., 3] * width
-
-    denormalized_box = tf.round(tf.stack([y1, x1, y2, x2], axis=-1))
-
-    colors = tf.random.uniform((len(labels), 4), maxval=256, dtype=tf.int32)
-
-    for index, bbox in enumerate(denormalized_box):
-        y1, x1, y2, x2 = tf.split(bbox, 4, axis=-1)
-        width = x2 - x1
-        height = y2 - y1
-
-        final_labels_ = tf.reshape(final_labels[0], shape=(200,))
-        final_scores_ = tf.reshape(final_scores[0], shape=(200,))
-        label_index = int(final_labels_[index])
-        color = tuple(colors[label_index].numpy())
-        label_text = "{0} {1:0.3f}".format(labels[label_index], final_scores_[index])
-        draw.text((x1 + 4, y1 + 2), label_text, fill=color)
-        draw.rectangle((x1, y1, x2, y2), outline=color, width=3)
-
-    return image
-
-
+    image, gt_boxes, gt_labels = next(train_set)
+    final_bboxes, final_labels, final_scores = decode_pred(model(image))
+    draw_output(image, final_bboxes, final_labels, final_scores, labels)
 
 # %%
