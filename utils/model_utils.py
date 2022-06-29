@@ -1,5 +1,6 @@
 import os
 import tensorflow as tf
+from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (
     Conv2D,
     Input,
@@ -15,7 +16,7 @@ from tensorflow.keras.layers import (
     Multiply,
     Activation,
 )
-from tensorflow.keras.models import Model
+from .bbox_utils import delta_to_bbox
 
 
 def yolo_v3(input_shape, labels, offset_grids, prior_grids, fine_tunning=True):
@@ -169,3 +170,28 @@ def yolo_head(inputs, offset_grids, prior_grids):
     ]
 
     return outputs
+
+
+def decode_pred(
+    pred,
+    batch_size=1,
+    max_total_size=200,
+    iou_threshold=0.5,
+    score_threshold=0.7,
+):
+    pred_yx, pred_hw, pred_obj, pred_cls = pred
+    pred_bboxes = delta_to_bbox(pred_yx, pred_hw, stride_grids)
+
+    pred_bboxes = tf.reshape(pred_bboxes, (batch_size, -1, 1, 4))
+    pred_labels = pred_cls * pred_obj
+
+    final_bboxes, final_scores, final_labels, _ = tf.image.combined_non_max_suppression(
+        pred_bboxes,
+        pred_labels,
+        max_output_size_per_class=max_total_size,
+        max_total_size=max_total_size,
+        iou_threshold=iou_threshold,
+        score_threshold=score_threshold,
+    )
+
+    return final_bboxes, final_labels, final_scores
