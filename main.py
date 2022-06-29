@@ -1,5 +1,6 @@
 #%%
 import os
+import tensorflow as tf
 from tqdm import tqdm
 from utils import (
     load_dataset,
@@ -15,69 +16,13 @@ from utils import (
     plugin_neptune,
     record_train_loss,
     delta_to_bbox,
+    decode_pred,
+    draw_output,
     NEPTUNE_API_KEY,
     NEPTUNE_PROJECT,
 )
 
-def decode_pred(
-    pred,
-    batch_size=1,
-    max_total_size=200,
-    iou_threshold=0.5,
-    score_threshold=0.7,
-):
-    pred_yx, pred_hw, pred_obj, pred_cls = pred
-    pred_bboxes = delta_to_bbox(pred_yx, pred_hw, stride_grids)
 
-    pred_bboxes = tf.reshape(pred_bboxes, (batch_size, -1, 1, 4))
-    pred_labels = pred_cls * pred_obj
-
-    final_bboxes, final_scores, final_labels, _ = tf.image.combined_non_max_suppression(
-        pred_bboxes,
-        pred_labels,
-        max_output_size_per_class=max_total_size,
-        max_total_size=max_total_size,
-        iou_threshold=iou_threshold,
-        score_threshold=score_threshold,
-    )
-
-    return final_bboxes, final_labels, final_scores
-
-def draw_output(
-    image,
-    final_bboxes,
-    final_labels,
-    final_scores,
-    labels,
-):
-    image = tf.squeeze(image, axis=0)
-    image = tf.keras.preprocessing.image.array_to_img(image)
-    width, height = image.size
-    draw = ImageDraw.Draw(image)
-
-    y1 = final_bboxes[0][..., 0] * height
-    x1 = final_bboxes[0][..., 1] * width
-    y2 = final_bboxes[0][..., 2] * height
-    x2 = final_bboxes[0][..., 3] * width
-
-    denormalized_box = tf.round(tf.stack([y1, x1, y2, x2], axis=-1))
-
-    colors = tf.random.uniform((len(labels), 4), maxval=256, dtype=tf.int32)
-
-    for index, bbox in enumerate(denormalized_box):
-        y1, x1, y2, x2 = tf.split(bbox, 4, axis=-1)
-        width = x2 - x1
-        height = y2 - y1
-
-        final_labels_ = tf.reshape(final_labels[0], shape=(200,))
-        final_scores_ = tf.reshape(final_scores[0], shape=(200,))
-        label_index = int(final_labels_[index])
-        color = tuple(colors[label_index].numpy())
-        label_text = "{0} {1:0.3f}".format(labels[label_index], final_scores_[index])
-        draw.text((x1 + 4, y1 + 2), label_text, fill=color)
-        draw.rectangle((x1, y1, x2, y2), outline=color, width=3)
-
-    return image
 
 
 #%%
@@ -118,17 +63,103 @@ if __name__ == "__main__":
     train_set, valid_set, test_set = build_dataset(datasets, 1, [416,416])
     box_priors = load_box_prior(train_set, "coco/2017", [416,416], data_num)
     anchors, prior_grids, offset_grids, stride_grids = build_anchor_ops([416,416], box_priors)
-    model = yolo_v3([416,416]+[3], labels, offset_grids, prior_grids, fine_tunning=True)
-    # model.load_weights("C:/Users/USER/Documents/GitHub/YOLO/yolov3_org_weights/weights")
-    model.save("tmp.h5")
-    # model.load("tmp.h5")
     model = tf.keras.models.load_model("tmp.h5")
     
-import tensorflow as tf
-from PIL import ImageDraw
 
-    image, gt_boxes, gt_labels = next(train_set)
-    final_bboxes, final_labels, final_scores = decode_pred(model(image))
-    draw_output(image, final_bboxes, final_labels, final_scores, labels)
+    for _ in tqdm(range(100)):
+        image, gt_boxes, gt_labels = next(test_set)
+        final_bboxes, final_labels, final_scores = decode_pred(model(image))
+        draw_output(image, final_bboxes, final_labels, final_scores, labels)
 
 # %%
+
+import numpy as np
+import tensorflow as tf
+from .bbox_utils import generate_iou
+
+
+def calculate_PR(final_bbox, gt_box, mAP_threshold):
+    bbox_num = final_bbox.shape[1]
+    gt_num = gt_box.shape[1]
+
+    true_pos = tf.Variable(tf.zeros(bbox_num))
+    for i in range(bbox_num):
+        bbox = tf.split(final_bbox, bbox_num, axis=1)[i]
+
+        iou = generate_iou(bbox, gt_box)
+
+        best_iou = tf.reduce_max(iou, axis=1)
+        pos_num = tf.cast(tf.greater(best_iou, mAP_threshold), dtype=tf.float32)
+        if tf.reduce_sum(pos_num) >= 1:
+            gt_box = gt_box * tf.expand_dims(
+                tf.cast(1 - pos_num, dtype=tf.float32), axis=-1
+            )
+            true_pos = tf.tensor_scatter_nd_update(true_pos, [[i]], [1])
+    false_pos = 1.0 - true_pos
+    true_pos = tf.math.cumsum(true_pos)
+    false_pos = tf.math.cumsum(false_pos)
+
+    recall = true_pos / gt_num
+    precision = tf.math.divide(true_pos, true_pos + false_pos)
+
+    return precision, recall
+
+
+def calculate_AP_per_class(recall, precision):
+    interp = tf.constant([i / 10 for i in range(0, 11)])
+    AP = tf.reduce_max(
+        [tf.where(interp <= recall[i], precision[i], 0.0) for i in range(len(recall))],
+        axis=0,
+    )
+    AP = tf.reduce_sum(AP) / 11
+    return AP
+
+
+def calculate_AP_const(
+    final_bboxes, final_labels, gt_boxes, gt_labels, hyper_params, mAP_threshold=0.5
+):
+    total_labels = hyper_params["total_labels"]
+    AP = []
+    for c in range(1, total_labels):
+        if tf.math.reduce_any(final_labels == c) or tf.math.reduce_any(gt_labels == c):
+            final_bbox = tf.expand_dims(final_bboxes[final_labels == c], axis=0)
+            gt_box = tf.expand_dims(gt_boxes[gt_labels == c], axis=0)
+
+            if final_bbox.shape[1] == 0 or gt_box.shape[1] == 0:
+                ap = tf.constant(0.0)
+            else:
+                precision, recall = calculate_PR(final_bbox, gt_box, mAP_threshold)
+                ap = calculate_AP_per_class(recall, precision)
+            AP.append(ap)
+    if AP == []:
+        AP = 1.0
+    else:
+        AP = tf.reduce_mean(AP)
+    return AP
+
+
+def calculate_AP(final_bboxes, final_labels, gt_boxes, gt_labels, hyper_params):
+    total_labels = hyper_params["total_labels"]
+    mAP_threshold_lst = np.arange(0.5, 1.0, 0.05)
+    APs = []
+    for mAP_threshold in mAP_threshold_lst:
+        AP = []
+        for c in range(1, total_labels):
+            if tf.math.reduce_any(final_labels == c) or tf.math.reduce_any(
+                gt_labels == c
+            ):
+                final_bbox = tf.expand_dims(final_bboxes[final_labels == c], axis=0)
+                gt_box = tf.expand_dims(gt_boxes[gt_labels == c], axis=0)
+
+                if final_bbox.shape[1] == 0 or gt_box.shape[1] == 0:
+                    ap = tf.constant(0.0)
+                else:
+                    precision, recall = calculate_PR(final_bbox, gt_box, mAP_threshold)
+                    ap = calculate_AP_per_class(recall, precision)
+                AP.append(ap)
+        if AP == []:
+            AP = 1.0
+        else:
+            AP = tf.reduce_mean(AP)
+        APs.append(AP)
+    return tf.reduce_mean(APs)
