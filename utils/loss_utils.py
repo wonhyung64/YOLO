@@ -24,7 +24,7 @@ def loss_fn(pred, true, batch_size, lambda_lst):
     yx_loss = tf.reduce_sum(tf.square(pred_yx - true_yx) * true_obj) / batch_size * lambda_yx
     hw_loss = tf.reduce_sum(tf.square(pred_hw - true_hw) * true_obj) / batch_size * lambda_hw
     obj_loss = tf.reduce_sum(bce_fn(pred_obj, true_obj) * true_obj) / batch_size * lambda_obj
-    nobj_loss = tf.reduce_sum(bce_fn(tf.constant(1, dtype=tf.float32) - pred_obj, true_nobj) * (true_nobj)) / batch_size * lambda_nobj
+    nobj_loss = tf.reduce_sum(bce_fn(pred_obj, true_obj) * (true_nobj)) / batch_size * lambda_nobj
     cls_loss = tf.reduce_sum(bce_fn(pred_cls, true_cls) * true_obj) / batch_size * lambda_cls
 
     return yx_loss, hw_loss, obj_loss, nobj_loss, cls_loss
