@@ -65,5 +65,10 @@ from .variable import (
 )
 
 from .result_utils import (
+    calculate_pr,
     draw_output,
+    calculate_ap,
+    calculate_ap_const,
+    calculate_ap_per_class,
+    calculate_pr,
 )
