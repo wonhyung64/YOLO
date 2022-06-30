@@ -174,6 +174,7 @@ def yolo_head(inputs, offset_grids, prior_grids):
 
 def decode_pred(
     pred,
+    stride_grids,
     batch_size=1,
     max_total_size=200,
     iou_threshold=0.5,
