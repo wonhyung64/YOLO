@@ -19,9 +19,10 @@ from tensorflow.keras.layers import (
 from .bbox_utils import delta_to_bbox
 
 
-def yolo_v3(input_shape, labels, offset_grids, prior_grids, fine_tunning=True):
+def yolo_v3(input_shape, labels, offset_grids, prior_grids, data_dir, fine_tunning=True):
     base_model = DarkNet53(include_top=False, input_shape=input_shape)
-    base_model.load_weights(os.getcwd() + '/darknet_weights/weights')#
+    weights_dir = f"{data_dir}/darknet_weights/weights"
+    base_model.load_weights(weights_dir)#
     if fine_tunning == False: base_model.trainable=False
 
     total_labels = len(labels)
@@ -150,6 +151,7 @@ def conv_block(inp, convs, skip=True):
 				   use_bias=False if conv['bnorm'] else True)(x)
 		if conv['bnorm']: x = BatchNormalization(epsilon=0.001, name='bnorm_' + str(conv['layer_idx']))(x)
 		if conv['leaky']: x = LeakyReLU(alpha=0.1, name='leaky_' + str(conv['layer_idx']))(x)
+
 	return Add()([skip_connection, x]) if skip else x
 
 
