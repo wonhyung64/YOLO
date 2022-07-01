@@ -1,4 +1,3 @@
-#%%
 import os
 import time
 import tensorflow as tf
@@ -65,10 +64,10 @@ def train(
 
         run["validation/mAP"].log(mean_ap.numpy())
 
-        # if mean_ap.numpy() > best_mean_ap:
-        #     best_mean_ap = mean_ap.numpy()
-        model.save_weights(weights_dir)
-        run["model"].upload(weights_dir)
+        if mean_ap.numpy() > best_mean_ap:
+            best_mean_ap = mean_ap.numpy()
+            model.save_weights(weights_dir)
+            run["model"].upload(weights_dir)
 
     train_time = time.time() - start_time
 
@@ -119,8 +118,7 @@ def test(run, test_num, test_set, model, stride_grids, labels):
     return mean_ap, mean_test_time
 
 
-#%%
-if __name__ == "__main__":
+def main():
     args = build_args()
     run = plugin_neptune(NEPTUNE_API_KEY, NEPTUNE_PROJECT, args)
 
@@ -136,7 +134,7 @@ if __name__ == "__main__":
     train_set, valid_set, test_set = build_dataset(datasets, args.batch_size, args.img_size)
     box_priors = load_box_prior(train_set, args.name, args.img_size, train_num)
     anchors, prior_grids, offset_grids, stride_grids = build_anchor_ops(args.img_size, box_priors)
-    model = yolo_v3(args.img_size+[3], labels, offset_grids, prior_grids, fine_tunning=True)
+    model = yolo_v3(args.img_size+[3], labels, offset_grids, prior_grids, args.data_dir, fine_tunning=True)
     optimizer = build_optimizer(args.batch_size, train_num)
 
     train_time = train(run, args, train_num, train_set, valid_set, labels, anchors, stride_grids, model, optimizer, lambda_lst, weights_dir)
@@ -146,3 +144,6 @@ if __name__ == "__main__":
 
     sync_neptune(run, experiment_name, mean_ap, train_time, mean_test_time, NEPTUNE_API_KEY, NEPTUNE_PROJECT)
 
+
+if __name__ == "__main__":
+    main()
