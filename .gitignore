@@ -18,3 +18,4 @@ __pycache__/
 /yolov3_org_weights
 data_chkr
 utils/variable.py
+model_weights
