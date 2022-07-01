@@ -19,3 +19,4 @@ __pycache__/
 data_chkr
 utils/variable.py
 model_weights
+run.sh
