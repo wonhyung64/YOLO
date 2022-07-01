@@ -27,36 +27,40 @@ def load_dataset(name, data_dir):
     )
     train_set = train1.concatenate(train2)
 
-    data_num = load_data_num(name, train_set)
+    train_num, test_num = load_data_num(name, train_set, test_set)
 
     try:
         labels = dataset_info.features["labels"].names
     except:
         labels = dataset_info.features["objects"]["label"].names
 
-    return (train_set, valid_set, test_set), labels, data_num
+    return (train_set, valid_set, test_set), labels, train_num, test_num
 
 
-def load_data_num(name, dataset):
-    data_num_dir = (
-        f"./data_chkr/{''.join(char for char in name if char.isalnum())}_num.txt"
-    )
+def load_data_num(name, train_set, test_set):
+    data_nums = []
+    for dataset, dataset_name in ((train_set, "train"), (test_set, "test")):
+        data_num_dir = (
+            f"./data_chkr/{''.join(char for char in name if char.isalnum())}_{dataset_name}_num.txt"
+        )
 
-    if not (os.path.exists(data_num_dir)):
-        data_num = build_data_num(dataset)
-        with open(data_num_dir, "w") as f:
-            f.write(str(data_num))
-            f.close()
-    else:
-        with open(data_num_dir, "r") as f:
-            data_num = int(f.readline())
-    return data_num
+        if not (os.path.exists(data_num_dir)):
+            data_num = build_data_num(dataset, dataset_name)
+            with open(data_num_dir, "w") as f:
+                f.write(str(data_num))
+                f.close()
+        else:
+            with open(data_num_dir, "r") as f:
+                data_num = int(f.readline())
+        data_nums.append(data_num)
+
+    return data_nums
 
 
-def build_data_num(dataset):
+def build_data_num(dataset, dataset_name):
     num_chkr = iter(dataset)
     data_num = 0
-    print("\nCounting number of data\n")
+    print(f"\nCounting number of {dataset_name} data\n")
     while True:
         try:
             next(num_chkr)
