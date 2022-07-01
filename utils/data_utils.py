@@ -7,6 +7,8 @@ from tensorflow.keras.layers import Lambda
 
 
 def load_dataset(name, data_dir):
+    data_dir = f"{data_dir}/tfds"
+
     train1, dataset_info = tfds.load(
         name=name, split="train", data_dir=data_dir, with_info=True
     )
