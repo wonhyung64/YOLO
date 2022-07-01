@@ -51,7 +51,7 @@ def train(
             epoch_progress.set_description(
                 "Epoch {}/{} | yx {:.4f}, hw {:.4f}, obj {:.4f}, nobj {:.4f}, cls {:.4f}, total {:.4f}".format(
                     epoch+1,
-                    args.epochs+1,
+                    args.epochs,
                     loss[0].numpy(),
                     loss[1].numpy(),
                     loss[2].numpy(),
@@ -66,8 +66,8 @@ def train(
 
         if mean_ap.numpy() > best_mean_ap:
             best_mean_ap = mean_ap.numpy()
-            model.save_weights(weights_dir)
-            run["model"].upload(weights_dir)
+        model.save_weights(weights_dir)
+        run["model"].upload(weights_dir)
 
     train_time = time.time() - start_time
 
