@@ -159,7 +159,7 @@ def build_anchor(flat_grid_y_ctr, flat_grid_x_ctr, box_prior):
     )
     h, w = tf.split(box_prior, 2, axis=-1)
     base_anchors = tf.concat([-h/2, -w/2, h/2, w/2], axis=-1)
-    anchors = tf.reshape(base_anchors, (1, -1, 4)) + tf.reshape(grid_map, (-1, 1, 4))
+    anchors = tf.reshape(base_anchors, (1, -1, 4)) + tf.reshape(tf.cast(grid_map, dtype=tf.float32), (-1, 1, 4))
     anchors = tf.reshape(anchors, (-1, 4))
 
     return anchors
