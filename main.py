@@ -64,10 +64,9 @@ def train(
 
         run["validation/mAP"].log(mean_ap.numpy())
 
-        if mean_ap.numpy() > best_mean_ap:
-            best_mean_ap = mean_ap.numpy()
+        # if mean_ap.numpy() > best_mean_ap:
+        #     best_mean_ap = mean_ap.numpy()
         model.save_weights(weights_dir)
-        run["model"].upload(weights_dir)
 
     train_time = time.time() - start_time
 
@@ -142,7 +141,7 @@ def main():
     model.load_weights(weights_dir)
     mean_ap, mean_test_time = test(run, test_num, test_set, model, stride_grids, labels)
 
-    sync_neptune(run, experiment_name, mean_ap, train_time, mean_test_time, NEPTUNE_API_KEY, NEPTUNE_PROJECT)
+    sync_neptune(run, weights_dir, experiment_name, mean_ap, train_time, mean_test_time, NEPTUNE_API_KEY, NEPTUNE_PROJECT)
 
 
 if __name__ == "__main__":
