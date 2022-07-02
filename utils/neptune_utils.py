@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import subprocess
 
 try: import neptune.new as neptune
@@ -29,14 +30,16 @@ def record_train_loss(run, loss, total_loss):
     run["train/loss/total_loss"].log(total_loss.numpy())
 
 
-def sync_neptune(run, experiment_name, mean_ap, train_time, mean_test_time, NEPTUNE_API_KEY, NEPTUNE_PROJECT):
+def sync_neptune(run, weights_dir, experiment_name, mean_ap, train_time, mean_test_time, NEPTUNE_API_KEY, NEPTUNE_PROJECT):
     res = {
         "mean_ap": "%.3f" % (mean_ap.numpy()),
         "train_time": train_time,
         "inference_time": "%.2fms" % (mean_test_time.numpy()),
     }
     run["results"] = res
+    run["model"].upload(weights_dir)
 
     os.environ["NEPTUNE_API_TOKEN"] = NEPTUNE_API_KEY
     cmd = f"neptune sync -p {NEPTUNE_PROJECT} --run offline/run__{experiment_name}"
     subprocess.check_output(cmd, shell = True)
+    # time.sleep(2400)
