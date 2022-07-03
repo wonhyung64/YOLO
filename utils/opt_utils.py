@@ -3,7 +3,7 @@ import subprocess
 import tensorflow as tf
 try: import tensorflow_addons as tfa
 except:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "tensorflow-addons"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "tensorflow-addons==0.12.0"])
     import tensorflow_addons as tfa
 
 from .loss_utils import loss_fn
