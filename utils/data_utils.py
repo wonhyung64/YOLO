@@ -73,7 +73,7 @@ def build_data_num(dataset, dataset_name):
     return data_num
 
 
-def build_dataset(datasets, batch_size, img_size):
+def build_dataset(datasets, batch_size, img_size, strategy):
     train_set, valid_set, test_set = datasets
     data_shapes = ([None, None, None], [None, None], [None])
     padding_values = (
@@ -110,6 +110,10 @@ def build_dataset(datasets, batch_size, img_size):
     train_set = train_set.prefetch(tf.data.experimental.AUTOTUNE)
     valid_set = valid_set.prefetch(tf.data.experimental.AUTOTUNE)
     test_set = test_set.prefetch(tf.data.experimental.AUTOTUNE)
+    
+    train_set = strategy.experimental_distribute_dataset(train_set)
+    valid_set = strategy.experimental_distribute_dataset(valid_set)
+    test_set = strategy.experimental_distribute_dataset(test_set)
 
     train_set = iter(train_set)
     valid_set = iter(valid_set)
