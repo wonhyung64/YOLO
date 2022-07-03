@@ -124,7 +124,7 @@ def test(run, test_num, test_set, model, stride_grids, labels):
 def main():
     args = build_args()
     run = plugin_neptune(NEPTUNE_API_KEY, NEPTUNE_PROJECT, args)
-    mirrored_strategy = tf.distribute.MirroredStrategy()
+    strategy = tf.distribute.MirroredStrategy()
 
     experiment_name = run.get_url().split("/")[1]
     experiment_dir = "./model_weights/experiment"
@@ -135,13 +135,13 @@ def main():
 
     lambda_lst = build_lambda(args)
     datasets, labels, train_num, test_num = load_dataset(name=args.name, data_dir=args.data_dir)
-    train_set, valid_set, test_set = build_dataset(datasets, args.batch_size, args.img_size, mirrored_strategy)
+    train_set, valid_set, test_set = build_dataset(datasets, args.batch_size, args.img_size, strategy)
     box_priors = load_box_prior(train_set, args.name, args.img_size, train_num)
     anchors, prior_grids, offset_grids, stride_grids = build_anchor_ops(args.img_size, box_priors)
-    with mirrored_strategy.scope():
+    with strategy.scope():
         model = yolo_v3(args.img_size+[3], labels, offset_grids, prior_grids, args.data_dir, fine_tunning=True)
         optimizer = build_optimizer(args.batch_size, train_num)
-    with mirrored_strategy.scope():
+    with strategy.scope():
         train_time = train(run, args, train_num, train_set, valid_set, labels, anchors, stride_grids, model, optimizer, lambda_lst, weights_dir, mirrored_strategy)
 
     model.load_weights(weights_dir)
