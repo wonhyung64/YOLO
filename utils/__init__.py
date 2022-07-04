@@ -73,3 +73,7 @@ from .result_utils import (
     calculate_ap_per_class,
     calculate_pr,
 )
+
+from .gpu_utils import (
+    gpu_memory_growth,
+)
