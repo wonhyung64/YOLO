@@ -1,9 +1,10 @@
 import os
 import time
-import tensorflow as tf
 import neptune.new as neptune
 from tqdm import tqdm
+import tensorflow as tf
 from utils import (
+    gpu_memory_growth,
     load_dataset,
     build_dataset,
     load_box_prior,
@@ -46,10 +47,9 @@ def train(
         epoch_progress = tqdm(range(train_num//args.batch_size))
         for _ in epoch_progress:
             image, gt_boxes, gt_labels = next(train_set)
-            true = build_target(anchors, gt_boxes, gt_labels, labels, args.img_size, stride_grids)
-            loss = strategy.run(forward_backward, args=(image, true, model, optimizer, args.batch_size, lambda_lst,))
-            if args.data_dir != "D:/won/data":
-                loss = [strategy.reduce(tf.distribute.ReduceOp.MEAN, loss[i], axis=0) for i in range(len(loss))]
+            true = strategy.run(build_target, args=(anchors, gt_boxes, gt_labels, labels, args.img_size, stride_grids))
+            loss = strategy.run(forward_backward, args=(image, true, model, optimizer, args.batch_size, lambda_lst))
+            loss = [strategy.reduce(tf.distribute.ReduceOp.MEAN, loss[i], axis=None) for i in range(len(loss))]
             total_loss = tf.reduce_sum(loss)
             record_train_loss(run, loss, total_loss)
             epoch_progress.set_description(
@@ -64,12 +64,12 @@ def train(
                     total_loss.numpy(),
                 )
             )
-        mean_ap = validation(valid_set, stride_grids, model, labels)
+        mean_ap = validation(valid_set, stride_grids, model, labels, strategy)
 
         run["validation/mAP"].log(mean_ap.numpy())
 
-        # if mean_ap.numpy() > best_mean_ap:
-        #     best_mean_ap = mean_ap.numpy()
+        if mean_ap.numpy() > best_mean_ap:
+            best_mean_ap = mean_ap.numpy()
         model.save_weights(weights_dir)
 
     train_time = time.time() - start_time
@@ -77,7 +77,7 @@ def train(
     return train_time
 
 
-def validation(valid_set, stride_grids, model, labels):
+def validation(valid_set, stride_grids, model, labels, strategy):
     aps = []
     validation_progress = tqdm(range(100))
     for _ in validation_progress:
@@ -126,6 +126,7 @@ def main():
     run = plugin_neptune(NEPTUNE_API_KEY, NEPTUNE_PROJECT, args)
     strategy = tf.distribute.MirroredStrategy()
 
+
     experiment_name = run.get_url().split("/")[1]
     experiment_dir = "./model_weights/experiment"
     weights_dir = f"{experiment_dir}/{experiment_name}.h5"
@@ -138,11 +139,12 @@ def main():
     train_set, valid_set, test_set = build_dataset(datasets, args.batch_size, args.img_size, strategy)
     box_priors = load_box_prior(train_set, args.name, args.img_size, train_num)
     anchors, prior_grids, offset_grids, stride_grids = build_anchor_ops(args.img_size, box_priors)
+
     with strategy.scope():
         model = yolo_v3(args.img_size+[3], labels, offset_grids, prior_grids, args.data_dir, fine_tunning=True)
         optimizer = build_optimizer(args.batch_size, train_num)
     with strategy.scope():
-        train_time = train(run, args, train_num, train_set, valid_set, labels, anchors, stride_grids, model, optimizer, lambda_lst, weights_dir, mirrored_strategy)
+        train_time = train(run, args, train_num, train_set, valid_set, labels, anchors, stride_grids, model, optimizer, lambda_lst, weights_dir, strategy)
 
     model.load_weights(weights_dir)
     mean_ap, mean_test_time = test(run, test_num, test_set, model, stride_grids, labels)
