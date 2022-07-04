@@ -112,8 +112,6 @@ def build_dataset(datasets, batch_size, img_size, strategy):
     test_set = test_set.prefetch(tf.data.experimental.AUTOTUNE)
     
     train_set = strategy.experimental_distribute_dataset(train_set)
-    valid_set = strategy.experimental_distribute_dataset(valid_set)
-    test_set = strategy.experimental_distribute_dataset(test_set)
 
     train_set = iter(train_set)
     valid_set = iter(valid_set)
