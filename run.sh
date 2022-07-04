@@ -16,8 +16,3 @@ module add CUDA/11.2.2
 module add ANACONDA/2020.11
 
 python /home1/wonhyung64/Github/YOLO/main.py --data-dir /home1/wonhyung64/data --epochs 1
-python /home1/wonhyung64/Github/YOLO/main.py --data-dir /home1/wonhyung64/data --epochs 1
-python /home1/wonhyung64/Github/YOLO/main.py --data-dir /home1/wonhyung64/data --epochs 1
-python /home1/wonhyung64/Github/YOLO/main.py --data-dir /home1/wonhyung64/data --epochs 1
-python /home1/wonhyung64/Github/YOLO/main.py --data-dir /home1/wonhyung64/data --epochs 1
-python /home1/wonhyung64/Github/YOLO/main.py --data-dir /home1/wonhyung64/data --epochs 1
