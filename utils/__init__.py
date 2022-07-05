@@ -57,7 +57,7 @@ from .args_utils import (
 from .neptune_utils import (
     record_train_loss,
     plugin_neptune,
-    sync_neptune,
+    record_result,
 )
 
 from .variable import (
