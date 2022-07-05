@@ -20,7 +20,7 @@ from utils import (
     decode_pred,
     draw_output,
     calculate_ap_const,
-    sync_neptune,
+    record_result,
     NEPTUNE_API_KEY,
     NEPTUNE_PROJECT,
 )
@@ -70,7 +70,7 @@ def train(
 
         if mean_ap.numpy() > best_mean_ap:
             best_mean_ap = mean_ap.numpy()
-        model.save_weights(weights_dir)
+            model.save_weights(weights_dir)
 
     train_time = time.time() - start_time
 
@@ -123,17 +123,15 @@ def test(run, test_num, test_set, model, stride_grids, labels):
 
 def main():
     args = build_args()
+    os.makedirs("./data_chkr", exist_ok=True)
     run = plugin_neptune(NEPTUNE_API_KEY, NEPTUNE_PROJECT, args)
-    strategy = tf.distribute.MirroredStrategy()
 
-
-    experiment_name = run.get_url().split("/")[1]
+    experiment_name = run.get_run_url().split("/")[-1].replace("-", "_")
     experiment_dir = "./model_weights/experiment"
+    os.makedirs(experiment_dir, exist_ok=True)
     weights_dir = f"{experiment_dir}/{experiment_name}.h5"
 
-    os.makedirs(experiment_dir, exist_ok=True)
-    os.makedirs("./data_chkr", exist_ok=True)
-
+    strategy = tf.distribute.MirroredStrategy()
     lambda_lst = build_lambda(args)
     datasets, labels, train_num, test_num = load_dataset(name=args.name, data_dir=args.data_dir)
     train_set, valid_set, test_set = build_dataset(datasets, args.batch_size, args.img_size, strategy)
@@ -149,7 +147,7 @@ def main():
     model.load_weights(weights_dir)
     mean_ap, mean_test_time = test(run, test_num, test_set, model, stride_grids, labels)
 
-    sync_neptune(run, weights_dir, experiment_name, mean_ap, train_time, mean_test_time, NEPTUNE_API_KEY, NEPTUNE_PROJECT)
+    record_result(run, weights_dir, mean_ap, train_time, mean_test_time)
 
 
 if __name__ == "__main__":
