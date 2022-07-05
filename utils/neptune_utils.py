@@ -12,7 +12,7 @@ except:
 def plugin_neptune(NEPTUNE_API_KEY, NEPTUNE_PROJECT, args):
     run = neptune.init(project=NEPTUNE_PROJECT,
                        api_token=NEPTUNE_API_KEY,
-                       mode="offline",
+                       mode="async",
                        )
 
     run["sys/name"] = "yolo-optimization"
@@ -30,7 +30,7 @@ def record_train_loss(run, loss, total_loss):
     run["train/loss/total_loss"].log(total_loss.numpy())
 
 
-def sync_neptune(run, weights_dir, experiment_name, mean_ap, train_time, mean_test_time, NEPTUNE_API_KEY, NEPTUNE_PROJECT):
+def record_result(run, weights_dir, mean_ap, train_time, mean_test_time):
     res = {
         "mean_ap": "%.3f" % (mean_ap.numpy()),
         "train_time": train_time,
@@ -38,8 +38,3 @@ def sync_neptune(run, weights_dir, experiment_name, mean_ap, train_time, mean_te
     }
     run["results"] = res
     run["model"].upload(weights_dir)
-
-    os.environ["NEPTUNE_API_TOKEN"] = NEPTUNE_API_KEY
-    cmd = f"neptune sync -p {NEPTUNE_PROJECT} --run offline/run__{experiment_name}"
-    subprocess.check_output(cmd, shell = True)
-    # time.sleep(2400)
