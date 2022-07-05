@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --partition=gpu1
 ##
-#SBATCH --job-name=swh
+#SBATCH --job-name=yolo_coco17
 #SBATCH -o SLURM.%N.%j.out
 #SBATCH -e SLURM.%N.%j.err
 ##
@@ -15,4 +15,4 @@ date
 module add CUDA/11.2.2
 module add ANACONDA/2020.11
 
-python /home1/wonhyung64/Github/YOLO/main.py --data-dir /home1/wonhyung64/data --epochs 1
+python /home1/wonhyung64/Github/YOLO/main.py --data-dir /home1/wonhyung64/data --batch-size 64 --name coco/2017
