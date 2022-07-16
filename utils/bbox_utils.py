@@ -39,7 +39,7 @@ def delta_to_bbox(delta_yx, delta_hw, stride_grids):
     bbox_y1x1 = delta_yx - (0.5 * delta_hw)
     bbox_y2x2 = delta_yx + (0.5 * delta_hw)
     bbox = tf.concat([bbox_y1x1, bbox_y2x2], axis=-1) / 416
-    bbox = tf.clip_by_value(bbox, 0., 1.)
+    bbox = tf.clip_by_value(bbox, 0.0, 1.0)
 
     return bbox
 
@@ -48,8 +48,8 @@ def bbox_to_delta(bbox, img_size, stride_grids):
     bbox = bbox * img_size[0]
     y1, x1, y2, x2 = tf.split(bbox, 4, axis=-1)
 
-    delta_y = (y1 + y2) / 2 
-    delta_x = (x1 + x2) / 2 
+    delta_y = (y1 + y2) / 2
+    delta_x = (x1 + x2) / 2
     delta_h = y2 - y1
     delta_w = x2 - x1
 

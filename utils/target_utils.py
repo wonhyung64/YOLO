@@ -2,11 +2,20 @@ import tensorflow as tf
 from .bbox_utils import calculate_iou, bbox_to_delta
 
 
-def build_target(anchors, gt_boxes, gt_labels, labels, img_size, stride_grids, ignore_threshold=0.5):
+def build_target(
+    anchors, gt_boxes, gt_labels, labels, img_size, stride_grids, ignore_threshold=0.5
+):
     iou_map = calculate_iou(anchors, gt_boxes)
-    valid_indices, valid_gt_boxes, valid_gt_labels, scatter_bbox_indices = extract_valid_boxes(iou_map, gt_boxes, gt_labels)
+    (
+        valid_indices,
+        valid_gt_boxes,
+        valid_gt_labels,
+        scatter_bbox_indices,
+    ) = extract_valid_boxes(iou_map, gt_boxes, gt_labels)
 
-    true_yx, true_hw = build_true_reg(scatter_bbox_indices, valid_gt_boxes, iou_map, img_size, stride_grids)
+    true_yx, true_hw = build_true_reg(
+        scatter_bbox_indices, valid_gt_boxes, iou_map, img_size, stride_grids
+    )
     true_obj, pos_mask = build_true_obj(scatter_bbox_indices, valid_indices, iou_map)
     true_nobj = build_true_nobj(iou_map, ignore_threshold, pos_mask)
     true_cls = build_true_cls(scatter_bbox_indices, valid_gt_labels, iou_map, labels)
@@ -26,7 +35,9 @@ def extract_valid_boxes(iou_map, gt_boxes, gt_labels):
     return valid_indices, valid_gt_boxes, valid_gt_labels, scatter_bbox_indices
 
 
-def build_true_reg(scatter_bbox_indices, valid_gt_boxes, iou_map, img_size, stride_grids):
+def build_true_reg(
+    scatter_bbox_indices, valid_gt_boxes, iou_map, img_size, stride_grids
+):
     true_reg = tf.scatter_nd(
         indices=scatter_bbox_indices,
         updates=valid_gt_boxes,
@@ -56,7 +67,8 @@ def build_true_obj(scatter_bbox_indices, valid_indices, iou_map):
 def build_true_nobj(iou_map, ignore_threshold, pos_mask):
     merged_iou_map = tf.reduce_max(iou_map, axis=2)
     neg_mask = tf.logical_and(
-        tf.less(merged_iou_map, ignore_threshold), tf.logical_not(pos_mask))
+        tf.less(merged_iou_map, ignore_threshold), tf.logical_not(pos_mask)
+    )
     true_nobj = tf.where(
         neg_mask,
         tf.ones_like(pos_mask, dtype=tf.float32),
@@ -79,4 +91,3 @@ def build_true_cls(scatter_bbox_indices, valid_gt_labels, iou_map, labels):
     true_cls = tf.one_hot(true_cls, len(labels), dtype=tf.float32)
 
     return true_cls
-

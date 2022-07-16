@@ -16,6 +16,4 @@ __pycache__/
 /yolo_atmp
 /darknet_weights
 /yolov3_org_weights
-data_chkr
-utils/variable.py
 model_weights

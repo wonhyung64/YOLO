@@ -1,8 +1,12 @@
 import tensorflow as tf
 
+
 @tf.function
 def bce_fn(pred, true):
-    bce_loss = -(true * tf.math.log(tf.clip_by_value(pred, 1e-9, 1.)) + (1-true) * tf.math.log(tf.clip_by_value(1 - pred, 1e-9, 1.)))
+    bce_loss = -(
+        true * tf.math.log(tf.clip_by_value(pred, 1e-9, 1.0))
+        + (1 - true) * tf.math.log(tf.clip_by_value(1 - pred, 1e-9, 1.0))
+    )
 
     return bce_loss
 
@@ -20,13 +24,26 @@ def loss_fn(pred, true, batch_size, lambda_lst):
     batch_size = tf.constant(batch_size, dtype=tf.float32)
     lambda_yx, lambda_hw, lambda_obj, lambda_nobj, lambda_cls = lambda_lst
 
-    yx_loss = tf.reduce_sum(tf.square(pred_yx - true_yx) * true_obj) / batch_size * lambda_yx
-    hw_loss = tf.reduce_sum(tf.square(pred_hw - true_hw) * true_obj) / batch_size * lambda_hw
-    obj_loss = tf.reduce_sum(bce_fn(pred_obj, true_obj) * true_obj) / batch_size * lambda_obj
-    nobj_loss = tf.reduce_sum(bce_fn(pred_obj, true_obj) * (true_nobj)) / batch_size * lambda_nobj
-    cls_loss = tf.reduce_sum(bce_fn(pred_cls, true_cls) * true_obj) / batch_size * lambda_cls
+    yx_loss = (
+        tf.reduce_sum(tf.square(pred_yx - true_yx) * true_obj) / batch_size * lambda_yx
+    )
+    hw_loss = (
+        tf.reduce_sum(tf.square(pred_hw - true_hw) * true_obj) / batch_size * lambda_hw
+    )
+    obj_loss = (
+        tf.reduce_sum(bce_fn(pred_obj, true_obj) * true_obj) / batch_size * lambda_obj
+    )
+    nobj_loss = (
+        tf.reduce_sum(bce_fn(pred_obj, true_obj) * (true_nobj))
+        / batch_size
+        * lambda_nobj
+    )
+    cls_loss = (
+        tf.reduce_sum(bce_fn(pred_cls, true_cls) * true_obj) / batch_size * lambda_cls
+    )
 
     return yx_loss, hw_loss, obj_loss, nobj_loss, cls_loss
+
 
 def build_lambda(args):
     lambda_dict = {
@@ -35,8 +52,11 @@ def build_lambda(args):
         "lambda_obj": args.lambda_obj,
         "lambda_nobj": args.lambda_nobj,
         "lambda_cls": args.lambda_cls,
-        }
+    }
 
-    lambda_lst = [tf.constant(lambda_value, dtype=tf.float32) for lambda_value in lambda_dict.values()]
+    lambda_lst = [
+        tf.constant(lambda_value, dtype=tf.float32)
+        for lambda_value in lambda_dict.values()
+    ]
 
     return lambda_lst

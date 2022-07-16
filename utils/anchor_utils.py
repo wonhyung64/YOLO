@@ -7,10 +7,8 @@ from sklearn.cluster import KMeans
 from tensorflow.keras.layers import Lambda
 
 
-def load_box_prior(dataset, name, img_size, data_num, k_per_grid=3):
-    box_prior_dir = (
-        f"./data_chkr/{''.join(char for char in name if char.isalnum())}_box_prior.csv"
-    )
+def load_box_prior(dataset, name, data_dir, img_size, data_num, k_per_grid=3):
+    box_prior_dir = f"{data_dir}/data_chkr/{''.join(char for char in name if char.isalnum())}_box_prior.csv"
     if not (os.path.exists(box_prior_dir)):
         box_prior = build_box_prior(dataset, img_size, data_num, k_per_grid)
         box_prior.to_csv(box_prior_dir, index=False, header=False)
@@ -99,15 +97,11 @@ def build_anchor_ops(img_size, box_priors):
         grid_y_ctr, grid_x_ctr = build_grid(feature_map_shape)
         flat_grid_x_ctr = tf.reshape(grid_x_ctr, (-1,))
         flat_grid_y_ctr = tf.reshape(grid_y_ctr, (-1,))
-        box_prior = box_priors[6-3*num:9-3*num] 
+        box_prior = box_priors[6 - 3 * num : 9 - 3 * num]
 
         anchor = build_anchor(flat_grid_y_ctr, flat_grid_x_ctr, box_prior / img_size[0])
         prior_grid = tf.tile(box_prior, (feature_map_shape * feature_map_shape, 1))
-        offset_grid = build_offset(
-            flat_grid_y_ctr,
-            flat_grid_x_ctr,
-            feature_map_shape
-            )
+        offset_grid = build_offset(flat_grid_y_ctr, flat_grid_x_ctr, feature_map_shape)
         stride_grid = tf.constant(stride, dtype=tf.float32, shape=tf.shape(offset_grid))
 
         anchors_lst.append(anchor)
@@ -137,18 +131,19 @@ def build_grid(feature_map_shape):
 def build_offset(flat_grid_y_ctr, flat_grid_x_ctr, feature_map_shape):
     offset_y = tf.tile(
         tf.expand_dims(flat_grid_y_ctr * feature_map_shape - 0.5, axis=-1),
-        multiples=[1,3]
-        )
+        multiples=[1, 3],
+    )
     offset_x = tf.tile(
         tf.expand_dims(flat_grid_x_ctr * feature_map_shape - 0.5, axis=-1),
-        multiples=[1,3]
-        )
+        multiples=[1, 3],
+    )
     offset = tf.stack(
         [
-        tf.reshape(offset_y, (-1)),
-        tf.reshape(offset_x, (-1)),
-        ]
-        , axis=-1)
+            tf.reshape(offset_y, (-1)),
+            tf.reshape(offset_x, (-1)),
+        ],
+        axis=-1,
+    )
 
     return offset
 
@@ -158,8 +153,10 @@ def build_anchor(flat_grid_y_ctr, flat_grid_x_ctr, box_prior):
         [flat_grid_y_ctr, flat_grid_x_ctr, flat_grid_y_ctr, flat_grid_x_ctr], axis=-1
     )
     h, w = tf.split(box_prior, 2, axis=-1)
-    base_anchors = tf.concat([-h/2, -w/2, h/2, w/2], axis=-1)
-    anchors = tf.reshape(base_anchors, (1, -1, 4)) + tf.reshape(tf.cast(grid_map, dtype=tf.float32), (-1, 1, 4))
+    base_anchors = tf.concat([-h / 2, -w / 2, h / 2, w / 2], axis=-1)
+    anchors = tf.reshape(base_anchors, (1, -1, 4)) + tf.reshape(
+        tf.cast(grid_map, dtype=tf.float32), (-1, 1, 4)
+    )
     anchors = tf.reshape(anchors, (-1, 4))
 
     return anchors
