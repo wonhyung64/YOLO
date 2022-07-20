@@ -14,6 +14,9 @@ def build_args():
     parser.add_argument("--lambda-nobj", type=float, default=1e-4)
     parser.add_argument("--lambda-cls", type=float, default=1e-3)
 
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except:
+        args = parser.parse_args([])
 
     return args
